@@ -1,0 +1,9 @@
+**/dist/**
+**/node_modules/**
+**/.next/**
+**/.turbo/**
+**/generated/**
+pnpm-lock.yaml
+
+# Prose docs are hand-maintained; don't let Prettier reflow them.
+*.md

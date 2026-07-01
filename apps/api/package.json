@@ -1,0 +1,17 @@
+{
+  "name": "@argus/api",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@argus/config": "workspace:*",
+    "@argus/contracts": "workspace:*",
+    "@argus/logger": "workspace:*"
+  }
+}

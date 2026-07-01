@@ -1,0 +1,9 @@
+{
+  "name": "@argus/dashboard",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "//": "Next.js app scaffolded later (architecture §14). Placeholder for now."
+  }
+}
