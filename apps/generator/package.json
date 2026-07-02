@@ -12,6 +12,7 @@
   "dependencies": {
     "@argus/config": "workspace:*",
     "@argus/contracts": "workspace:*",
-    "@argus/logger": "workspace:*"
+    "@argus/logger": "workspace:*",
+    "kafkajs": "^2.2.4"
   }
 }

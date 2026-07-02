@@ -4,7 +4,9 @@ name: argus
 
 services:
   kafka:
-    image: apache/kafka:3.9.0
+    # 3.9.0 has KAFKA-18281: KRaft startup fails validating the controller
+    # listener's bind address as if it were advertised. Fixed in 3.9.1.
+    image: apache/kafka:3.9.1
     container_name: argus-kafka
     ports:
       - '127.0.0.1:9092:9092'

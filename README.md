@@ -22,7 +22,7 @@ WebSockets · Docker Compose · pnpm + Turborepo.
 apps/
   generator/    # "fake infrastructure" — emits logs to Kafka + exposes the /simulate attack API
   api/          # processing monolith: streaming, parser, storage, detection, incident, ai, realtime
-  dashboard/    # Next.js real-time dashboard (scaffolded later)
+  dashboard/    # Next.js real-time dashboard
 packages/
   contracts/    # Zod schemas + inferred types — the single source of truth
   config/       # env parsing + validation (fail-fast at boot)

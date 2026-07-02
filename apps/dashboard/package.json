@@ -4,6 +4,22 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "//": "Next.js app scaffolded later (architecture §14). Placeholder for now."
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@argus/contracts": "workspace:*",
+    "geist": "^1.7.2",
+    "next": "^16.2.10",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.3.2",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "tailwindcss": "^4.3.2"
   }
 }

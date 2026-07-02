@@ -6,6 +6,9 @@ import { z } from 'zod';
 const EnvSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace']).default('info'),
+  PORT: z.coerce.number().int().positive().default(4000),
+  // generator runs its own HTTP surface (the /simulate trigger API, §15)
+  GENERATOR_PORT: z.coerce.number().int().positive().default(4200),
 
   KAFKA_BROKERS: z
     .string()
