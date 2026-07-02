@@ -29,7 +29,11 @@ function makeRaw(source: RawLog['source'], message: string): RawLog {
   });
 }
 
-export function authLog(opts: { user: string; ip: string; outcome: 'success' | 'failure' }): RawLog {
+export function authLog(opts: {
+  user: string;
+  ip: string;
+  outcome: 'success' | 'failure';
+}): RawLog {
   const port = 1024 + randInt(60000);
   const verb = opts.outcome === 'success' ? 'Accepted' : 'Failed';
   return makeRaw('auth', `${verb} password for ${opts.user} from ${opts.ip} port ${port} ssh2`);

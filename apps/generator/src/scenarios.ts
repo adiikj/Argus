@@ -47,8 +47,8 @@ function attackerIp(): string {
 
 const SQLI_PAYLOADS = [
   "/products?id=1' OR '1'='1",
-  "/products?id=1; DROP TABLE users--",
-  "/search?q=%27%20UNION%20SELECT%20password%20FROM%20users--",
+  '/products?id=1; DROP TABLE users--',
+  '/search?q=%27%20UNION%20SELECT%20password%20FROM%20users--',
   "/login?user=admin'--",
 ] as const;
 
@@ -86,7 +86,13 @@ export const SCENARIOS: Record<string, Scenario> = {
     generate: () => {
       const ip = attackerIp();
       return SQLI_PAYLOADS.map((path) =>
-        apiGatewayLog({ ip, method: 'GET', path, status: pick([400, 403, 500]), userAgent: 'sqlmap/1.8' }),
+        apiGatewayLog({
+          ip,
+          method: 'GET',
+          path,
+          status: pick([400, 403, 500]),
+          userAgent: 'sqlmap/1.8',
+        }),
       );
     },
   },
@@ -109,7 +115,13 @@ export const SCENARIOS: Record<string, Scenario> = {
       const ip = attackerIp();
       const hits = 40 + randInt(20);
       return Array.from({ length: hits }, () =>
-        apiGatewayLog({ ip, method: 'POST', path: '/api/login', status: pick([200, 429]), userAgent: 'python-requests/2.32' }),
+        apiGatewayLog({
+          ip,
+          method: 'POST',
+          path: '/api/login',
+          status: pick([200, 429]),
+          userAgent: 'python-requests/2.32',
+        }),
       );
     },
   },
@@ -121,7 +133,13 @@ export const SCENARIOS: Record<string, Scenario> = {
       const ip = attackerIp();
       const hits = 12 + randInt(8);
       return Array.from({ length: hits }, () =>
-        apiGatewayLog({ ip, method: 'GET', path: '/api/account', status: 401, userAgent: 'okhttp/4.12' }),
+        apiGatewayLog({
+          ip,
+          method: 'GET',
+          path: '/api/account',
+          status: 401,
+          userAgent: 'okhttp/4.12',
+        }),
       );
     },
   },

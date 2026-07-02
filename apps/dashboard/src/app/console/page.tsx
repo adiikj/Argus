@@ -4,7 +4,8 @@ import { useEffect, useState } from 'react';
 import type { Alert, Severity } from '@argus/contracts';
 import { Wordmark } from '../_components/wordmark';
 
-const WS_URL = 'ws://localhost:4100/ws';
+// Next inlines NEXT_PUBLIC_* at build time; falls back to the local api port.
+const WS_URL = process.env.NEXT_PUBLIC_WS_URL ?? 'ws://localhost:4100/ws';
 
 interface AlertMessage {
   type: 'alert.created';
