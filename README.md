@@ -7,9 +7,6 @@ processing monolith normalizes events, runs a rule-based **detection engine**, c
 **incidents**, and (optionally) generates **AI incident summaries** — all surfaced on a real-time dark
 security-console dashboard.
 
-> Architecture and the reasoning behind every decision live in
-> [`02-architecture-decisions.md`](./02-architecture-decisions.md). Scope/charter is in
-> [`01.md`](./01.md). The build log (decisions, bugs, tradeoffs) is in [`JOURNAL.md`](./JOURNAL.md).
 
 ## Stack
 
