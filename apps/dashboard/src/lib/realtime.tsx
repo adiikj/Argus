@@ -32,17 +32,27 @@ interface RealtimeState {
   summaries: Record<string, IncidentSummary>;
   connected: boolean;
   pipelineActivity: PipelineActivity[];
+  ruleCounts: Record<string, number>;
+  // alerts per hour-of-day (0-23) since this tab connected — a session-scoped
+  // approximation, not a durable historical record (resets on reload).
+  hourlyActivity: number[];
 }
 
 const RealtimeContext = createContext<RealtimeState | undefined>(undefined);
 
 const MAX_ACTIVITY = 50;
 
+function emptyHours(): number[] {
+  return Array.from({ length: 24 }, () => 0);
+}
+
 export function RealtimeProvider({ children }: { children: ReactNode }) {
   const [incidents, setIncidents] = useState<IncidentRow[]>([]);
   const [summaries, setSummaries] = useState<Record<string, IncidentSummary>>({});
   const [connected, setConnected] = useState(false);
   const [pipelineActivity, setPipelineActivity] = useState<PipelineActivity[]>([]);
+  const [ruleCounts, setRuleCounts] = useState<Record<string, number>>({});
+  const [hourlyActivity, setHourlyActivity] = useState<number[]>(emptyHours);
   const activityCounter = useRef(0);
 
   useEffect(() => {
@@ -86,6 +96,16 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
           `${payload.alert.ruleId} fired`,
           payload.alert.timestamp,
         );
+        setRuleCounts((prev) => ({
+          ...prev,
+          [payload.alert.ruleId]: (prev[payload.alert.ruleId] ?? 0) + 1,
+        }));
+        setHourlyActivity((prev) => {
+          const hour = new Date(payload.alert.timestamp).getHours();
+          const next = [...prev];
+          next[hour] = (next[hour] ?? 0) + 1;
+          return next;
+        });
         return;
       }
 
@@ -126,7 +146,9 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
   }, []);
 
   return (
-    <RealtimeContext.Provider value={{ incidents, summaries, connected, pipelineActivity }}>
+    <RealtimeContext.Provider
+      value={{ incidents, summaries, connected, pipelineActivity, ruleCounts, hourlyActivity }}
+    >
       {children}
     </RealtimeContext.Provider>
   );

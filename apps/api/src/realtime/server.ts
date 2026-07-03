@@ -4,6 +4,7 @@ import type { Alert, Incident, IncidentSummary, NormalizedEvent } from '@argus/c
 import type { Bus, IncidentEvent } from '../bus/index.js';
 import type { IncidentDetail } from '../incident/index.js';
 import type { EventSearchParams } from '../storage/index.js';
+import type { SystemHealth } from '../system/index.js';
 
 export interface EventTrace {
   eventId: string;
@@ -17,6 +18,7 @@ export interface RealtimeOptions {
   getIncidentDetail?: (id: string) => Promise<IncidentDetail | undefined>;
   searchEvents?: (params: EventSearchParams) => Promise<NormalizedEvent[]>;
   getEventTrace?: (eventId: string) => Promise<EventTrace>;
+  getSystemHealth?: () => Promise<SystemHealth>;
 }
 
 export async function createRealtimeServer(bus: Bus, port: number, opts: RealtimeOptions = {}) {
@@ -58,6 +60,17 @@ export async function createRealtimeServer(bus: Bus, port: number, opts: Realtim
     const { eventId } = req.params as { eventId: string };
     const trace = await opts.getEventTrace?.(eventId);
     return trace ?? { eventId, event: undefined, alerts: [], incidents: [] };
+  });
+
+  app.get('/system/health', async () => {
+    if (!opts.getSystemHealth) {
+      return {
+        kafka: { ok: false, consumerLag: [] },
+        elasticsearch: { ok: false, status: null },
+        postgres: { ok: false, latencyMs: null },
+      };
+    }
+    return opts.getSystemHealth();
   });
 
   const send = (payload: unknown): void => {

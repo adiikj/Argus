@@ -31,6 +31,7 @@ import {
   type PrismaClient,
 } from './incident/index.js';
 import { selectProvider, startAiEngine } from './ai/index.js';
+import { getSystemHealth } from './system/index.js';
 
 const config = loadConfig();
 const log = createLogger({ name: 'api', level: config.LOG_LEVEL });
@@ -123,6 +124,7 @@ async function startIncident(
 // Listens to the bus, not Kafka directly — the incident engine is the one
 // Kafka consumer on `alerts`, per §7's wiring.
 async function startRealtime(
+  kafka: Kafka,
   bus: Bus,
   prisma: PrismaClient,
   esClient: ReturnType<typeof createEsClient>,
@@ -139,6 +141,7 @@ async function startRealtime(
       ]);
       return { eventId, event, alerts, incidents };
     },
+    getSystemHealth: () => getSystemHealth(kafka, esClient, prisma),
   });
   log.info({ port: config.PORT }, 'realtime WS + REST (incidents, events, trace) listening');
 }
@@ -167,5 +170,5 @@ await startParser(kafka, producer, metrics);
 await startStorage(kafka, esClient, bus, hotEntities, metrics);
 await startDetection(kafka, producer, bus, hotEntities, metrics);
 await startIncident(kafka, prisma, bus, metrics);
-await startRealtime(bus, prisma, esClient, metrics);
+await startRealtime(kafka, bus, prisma, esClient, metrics);
 startAi(prisma, bus, metrics);

@@ -10,6 +10,7 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { useScenarios, useFireScenario, type ScenarioInfo } from '@/lib/use-simulator';
+import { useToast } from '@/lib/toast';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { PipelineFlow } from '../_components/pipeline-flow';
@@ -61,8 +62,17 @@ export default function SimulatorPage() {
 }
 
 function ScenarioCard({ scenario }: { scenario: ScenarioInfo }) {
-  const { mutate, isPending, isError, data } = useFireScenario();
+  const { mutate, isPending } = useFireScenario();
+  const { push } = useToast();
   const Icon = SCENARIO_ICON[scenario.name] ?? Zap;
+
+  const launch = (): void => {
+    mutate(scenario.name, {
+      onSuccess: (result) =>
+        push(`${scenario.name} fired — ${result.emitted} events emitted`, 'success'),
+      onError: () => push(`${scenario.name} failed to fire`, 'error'),
+    });
+  };
 
   return (
     <Card>
@@ -75,14 +85,10 @@ function ScenarioCard({ scenario }: { scenario: ScenarioInfo }) {
         </div>
         <CardDescription>{scenario.description}</CardDescription>
       </CardHeader>
-      <CardContent className="flex items-center gap-3">
-        <Button size="sm" disabled={isPending} onClick={() => mutate(scenario.name)}>
+      <CardContent>
+        <Button size="sm" disabled={isPending} onClick={launch}>
           {isPending ? 'Firing…' : 'Launch'}
         </Button>
-        {data && (
-          <span className="font-mono text-xs text-text-secondary">emitted {data.emitted}</span>
-        )}
-        {isError && <span className="font-mono text-xs text-severity-critical">failed</span>}
       </CardContent>
     </Card>
   );
