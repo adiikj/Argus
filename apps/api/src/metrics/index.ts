@@ -8,6 +8,8 @@ export interface MetricsSnapshot {
   parseFailures: number;
   eventsIndexed: number;
   alertsRaised: number;
+  incidentsOpened: number;
+  incidentsUpdated: number;
 }
 
 type Counter = Exclude<keyof MetricsSnapshot, 'uptimeSeconds'>;
@@ -25,6 +27,8 @@ export function createMetrics(): Metrics {
     parseFailures: 0,
     eventsIndexed: 0,
     alertsRaised: 0,
+    incidentsOpened: 0,
+    incidentsUpdated: 0,
   };
 
   return {

@@ -7,7 +7,10 @@
     "dev": "tsx watch src/index.ts",
     "build": "tsc",
     "start": "node dist/index.js",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "db:generate": "dotenv -e ../../.env -- prisma generate",
+    "db:migrate": "dotenv -e ../../.env -- prisma migrate dev",
+    "db:studio": "dotenv -e ../../.env -- prisma studio"
   },
   "dependencies": {
     "@argus/config": "workspace:*",
@@ -15,8 +18,13 @@
     "@argus/logger": "workspace:*",
     "@elastic/elasticsearch": "^8.19.1",
     "@fastify/websocket": "^11.2.0",
+    "@prisma/client": "^6.19.3",
     "fastify": "^5.9.0",
     "kafkajs": "^2.2.4",
     "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "dotenv-cli": "^11.0.0",
+    "prisma": "^6.19.3"
   }
 }

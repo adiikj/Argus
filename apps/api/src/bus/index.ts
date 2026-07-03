@@ -1,14 +1,22 @@
 import { EventEmitter } from 'node:events';
-import type { Alert } from '@argus/contracts';
+import type { Alert, Incident } from '@argus/contracts';
 
-interface BusEvents {
-  'alert.created': [Alert];
+// payload for both incident bus events: the incident's current state plus
+// whichever alert just caused this update, so subscribers (realtime, and
+// later ai) don't have to re-derive "what changed" themselves.
+export interface IncidentEvent {
+  incident: Incident;
+  latestAlert: Alert;
 }
 
-// in-process pub/sub for module decoupling. For now
-// realtime listens straight to 'alert.created' from detection. Once the
-// incident engine exists it'll sit in between, and realtime
-// will listen to 'incident.created'/'incident.updated' instead.
+interface BusEvents {
+  'incident.created': [IncidentEvent];
+  'incident.updated': [IncidentEvent];
+}
+
+// in-process pub/sub for module decoupling. The incident engine (§7) is the
+// only publisher; realtime (§9) and, later, ai (§8) are the subscribers —
+// neither imports the other directly.
 export type Bus = EventEmitter<BusEvents>;
 
 export function createBus(): Bus {

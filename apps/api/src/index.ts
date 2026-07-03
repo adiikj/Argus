@@ -13,9 +13,10 @@ import {
 import { parseRawLog } from './parser/index.js';
 import { createEsClient, ensureEventsIndex, indexEvent } from './storage/index.js';
 import { createRuleEngine, RULES, SeenEventIds } from './detection/index.js';
-import { createBus } from './bus/index.js';
+import { createBus, type Bus } from './bus/index.js';
 import { createRealtimeServer } from './realtime/index.js';
 import { createMetrics, type Metrics } from './metrics/index.js';
+import { createPrismaClient, attachAlert, type PrismaClient } from './incident/index.js';
 
 const config = loadConfig();
 const log = createLogger({ name: 'api', level: config.LOG_LEVEL });
@@ -72,12 +73,29 @@ async function startDetection(kafka: Kafka, producer: StreamProducer, m: Metrics
   });
 }
 
-// realtime: alerts -> internal bus -> WS (independent of storage/detection, §4/§9)
-async function startRealtime(kafka: Kafka, m: Metrics): Promise<void> {
-  const bus = createBus();
-  await subscribe(kafka, 'api-realtime', TOPICS.ALERTS, async (value) => {
-    bus.emit('alert.created', Alert.parse(value));
+// incident: alerts -> correlate into Postgres incidents -> internal bus (§7)
+async function startIncident(
+  kafka: Kafka,
+  prisma: PrismaClient,
+  bus: Bus,
+  m: Metrics,
+): Promise<void> {
+  await subscribe(kafka, 'api-incident', TOPICS.ALERTS, async (value) => {
+    const alert = Alert.parse(value);
+    const { incident, isNew } = await attachAlert(prisma, alert);
+    m.incr(isNew ? 'incidentsOpened' : 'incidentsUpdated');
+    bus.emit(isNew ? 'incident.created' : 'incident.updated', { incident, latestAlert: alert });
+    log.info(
+      { incidentId: incident.incidentId, isNew, ruleId: alert.ruleId },
+      isNew ? 'incident opened' : 'incident updated',
+    );
   });
+}
+
+// realtime: internal bus -> WS (independent of storage/detection, §4/§9).
+// Listens to the bus, not Kafka directly — the incident engine is the one
+// Kafka consumer on `alerts`, per §7's wiring.
+async function startRealtime(bus: Bus, m: Metrics): Promise<void> {
   await createRealtimeServer(bus, config.PORT, { getMetrics: () => m.snapshot() });
   log.info({ port: config.PORT }, 'realtime WS + /healthz + /metrics listening');
 }
@@ -88,11 +106,15 @@ await ensureTopics(kafka);
 const esClient = createEsClient(config);
 await ensureEventsIndex(esClient);
 
+const prisma = createPrismaClient(config);
+
 const producer = await createProducer(kafka);
+const bus = createBus();
 
 await startParser(kafka, producer, metrics);
 await startStorage(kafka, esClient, metrics);
 await startDetection(kafka, producer, metrics);
-await startRealtime(kafka, metrics);
+await startIncident(kafka, prisma, bus, metrics);
+await startRealtime(bus, metrics);
 
-// TODO: composition root — wire incident/ai (Day 7/8)
+// TODO: composition root — wire ai (Day 8), subscribing to the same bus events

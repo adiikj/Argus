@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import type { Alert, Severity } from '@argus/contracts';
+import type { Alert, Incident, Severity } from '@argus/contracts';
 import { Wordmark } from '../_components/wordmark';
 
 // Next inlines NEXT_PUBLIC_* at build time; falls back to the local api port.
@@ -9,9 +9,12 @@ const WS_URL = process.env.NEXT_PUBLIC_WS_URL ?? 'ws://localhost:4100/ws';
 // same host/port as the WS, over http — for /metrics polling.
 const API_URL = WS_URL.replace(/^ws(s?):\/\//, 'http$1://').replace(/\/ws$/, '');
 
-interface AlertMessage {
-  type: 'alert.created';
-  alert: Alert;
+// realtime now speaks incidents, not raw alerts (§7) — an incident groups
+// every alert correlated onto the same entity within the correlation window.
+interface IncidentMessage {
+  type: 'incident.created' | 'incident.updated';
+  incident: Incident;
+  latestAlert: Alert;
 }
 
 interface Metrics {
@@ -21,6 +24,8 @@ interface Metrics {
   parseFailures: number;
   eventsIndexed: number;
   alertsRaised: number;
+  incidentsOpened: number;
+  incidentsUpdated: number;
 }
 
 const SEVERITY_ORDER: Severity[] = ['critical', 'high', 'medium', 'low', 'info'];
@@ -54,8 +59,13 @@ function formatUptime(seconds: number): string {
   return `${s}s`;
 }
 
+interface IncidentRow {
+  incident: Incident;
+  latestAlert: Alert;
+}
+
 export default function Console() {
-  const [alerts, setAlerts] = useState<Alert[]>([]);
+  const [incidents, setIncidents] = useState<IncidentRow[]>([]);
   const [connected, setConnected] = useState(false);
   const [metrics, setMetrics] = useState<Metrics | null>(null);
   const [filter, setFilter] = useState<Severity | 'all'>('all');
@@ -65,10 +75,22 @@ export default function Console() {
     socket.addEventListener('open', () => setConnected(true));
     socket.addEventListener('close', () => setConnected(false));
     socket.addEventListener('message', (event) => {
-      const payload = JSON.parse(event.data as string) as AlertMessage;
-      if (payload.type === 'alert.created') {
-        setAlerts((prev) => [payload.alert, ...prev].slice(0, 200));
-      }
+      const payload = JSON.parse(event.data as string) as IncidentMessage;
+      if (payload.type !== 'incident.created' && payload.type !== 'incident.updated') return;
+      setIncidents((prev) => {
+        const withoutPrior = prev.filter(
+          (row) => row.incident.incidentId !== payload.incident.incidentId,
+        );
+        const next = [
+          { incident: payload.incident, latestAlert: payload.latestAlert },
+          ...withoutPrior,
+        ];
+        next.sort(
+          (a, b) =>
+            new Date(b.incident.updatedAt).getTime() - new Date(a.incident.updatedAt).getTime(),
+        );
+        return next.slice(0, 200);
+      });
     });
     return () => socket.close();
   }, []);
@@ -95,11 +117,12 @@ export default function Console() {
 
   const severityCounts = useMemo(() => {
     const counts: Record<Severity, number> = { critical: 0, high: 0, medium: 0, low: 0, info: 0 };
-    for (const alert of alerts) counts[alert.severity] += 1;
+    for (const row of incidents) counts[row.incident.severity] += 1;
     return counts;
-  }, [alerts]);
+  }, [incidents]);
 
-  const visible = filter === 'all' ? alerts : alerts.filter((a) => a.severity === filter);
+  const visible =
+    filter === 'all' ? incidents : incidents.filter((row) => row.incident.severity === filter);
 
   return (
     <div className="min-h-screen bg-bg-base">
@@ -107,7 +130,7 @@ export default function Console() {
         <div className="mx-auto flex max-w-5xl items-center justify-between">
           <div className="flex items-center gap-3">
             <Wordmark />
-            <span className="text-sm text-text-secondary">live alert feed</span>
+            <span className="text-sm text-text-secondary">live incident feed</span>
           </div>
           <div className="flex items-center gap-2 font-mono text-xs text-text-secondary">
             <span
@@ -122,15 +145,16 @@ export default function Console() {
 
       <main className="mx-auto max-w-5xl px-6 py-8">
         {/* pipeline metrics */}
-        <div className="mb-6 grid grid-cols-2 gap-px overflow-hidden rounded-lg border border-border-subtle bg-border-subtle sm:grid-cols-4">
+        <div className="mb-6 grid grid-cols-2 gap-px overflow-hidden rounded-lg border border-border-subtle bg-border-subtle sm:grid-cols-5">
           <Metric
             label="events"
             value={metrics ? metrics.eventsNormalized.toLocaleString() : '—'}
           />
           <Metric label="indexed" value={metrics ? metrics.eventsIndexed.toLocaleString() : '—'} />
+          <Metric label="alerts" value={metrics ? metrics.alertsRaised.toLocaleString() : '—'} />
           <Metric
-            label="alerts"
-            value={metrics ? metrics.alertsRaised.toLocaleString() : '—'}
+            label="incidents"
+            value={metrics ? metrics.incidentsOpened.toLocaleString() : '—'}
             accent
           />
           <Metric
@@ -144,7 +168,7 @@ export default function Console() {
         <div className="mb-4 flex flex-wrap items-center gap-2">
           <FilterChip
             label="all"
-            count={alerts.length}
+            count={incidents.length}
             active={filter === 'all'}
             onClick={() => setFilter('all')}
           />
@@ -169,35 +193,37 @@ export default function Console() {
           <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed border-border-subtle py-24 text-center">
             <span className="h-2 w-2 animate-pulse rounded-full bg-accent" />
             <p className="text-sm text-text-secondary">
-              {alerts.length === 0 ? 'Waiting for detections…' : `No ${filter} alerts in view.`}
+              {incidents.length === 0
+                ? 'Waiting for detections…'
+                : `No ${filter} incidents in view.`}
             </p>
           </div>
         ) : (
           <ul className="flex flex-col gap-2">
-            {visible.map((alert) => (
+            {visible.map(({ incident, latestAlert }) => (
               <li
-                key={alert.alertId}
+                key={incident.incidentId}
                 className="animate-alert-in flex items-center gap-4 rounded-lg border border-border-subtle bg-bg-panel px-4 py-3"
               >
                 <span
-                  className={`shrink-0 rounded border px-2 py-0.5 font-mono text-[11px] font-semibold uppercase ${SEVERITY_BADGE[alert.severity]}`}
+                  className={`shrink-0 rounded border px-2 py-0.5 font-mono text-[11px] font-semibold uppercase ${SEVERITY_BADGE[incident.severity]}`}
                 >
-                  {alert.severity}
+                  {incident.severity}
                 </span>
                 <span className="hidden shrink-0 rounded bg-bg-elevated px-2 py-0.5 font-mono text-[11px] text-text-secondary sm:inline">
-                  {alert.ruleId}
+                  {latestAlert.ruleId}
                 </span>
                 <span className="shrink-0 font-mono text-sm text-text-secondary">
-                  {alert.entity}
+                  {incident.correlationKey}
                 </span>
-                <span className="flex-1 truncate text-sm text-text-primary">{alert.message}</span>
-                {alert.count !== undefined && (
-                  <span className="shrink-0 font-mono text-xs text-text-secondary">
-                    ×{alert.count}
-                  </span>
-                )}
+                <span className="flex-1 truncate text-sm text-text-primary">
+                  {latestAlert.message}
+                </span>
+                <span className="shrink-0 font-mono text-xs text-text-secondary">
+                  {incident.alertIds.length} alert{incident.alertIds.length === 1 ? '' : 's'}
+                </span>
                 <span className="shrink-0 font-mono text-xs text-text-secondary tabular-nums">
-                  {formatTime(alert.timestamp)}
+                  {formatTime(incident.updatedAt)}
                 </span>
               </li>
             ))}

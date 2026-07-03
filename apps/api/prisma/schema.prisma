@@ -1,0 +1,88 @@
+// Relational truth for alerts/incidents/summaries (architecture §5, §7). The
+// event stream itself lives in Elasticsearch — Postgres never stores events,
+// only the eventIds an alert/incident references.
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("POSTGRES_URL")
+}
+
+enum Severity {
+  info
+  low
+  medium
+  high
+  critical
+}
+
+enum IncidentStatus {
+  open
+  closed
+}
+
+enum Summarizer {
+  llm
+  template
+}
+
+// a correlated group of alerts from one entity within a time window (§7).
+// alertIds/eventIds are denormalized arrays kept in sync with the member
+// alerts inside the same transaction — cheap reads matching the Incident
+// wire contract exactly, at the cost of one source of truth living in two
+// places (Alert.incidentId is the real relation; the arrays are a cache).
+model Incident {
+  incidentId     String         @id @map("incident_id")
+  correlationKey String         @map("correlation_key")
+  severity       Severity
+  status         IncidentStatus @default(open)
+  createdAt      DateTime       @default(now()) @map("created_at")
+  updatedAt      DateTime       @map("updated_at")
+  alertIds       String[]       @map("alert_ids")
+  eventIds       String[]       @map("event_ids")
+
+  alerts  Alert[]
+  summary Summary?
+
+  @@index([correlationKey, status, updatedAt])
+  @@map("incidents")
+}
+
+// one rule firing. alertId/ruleId/timestamp etc. are assigned upstream by the
+// detection engine (§6) — Prisma just persists what it's given.
+model Alert {
+  alertId    String   @id @map("alert_id")
+  ruleId     String   @map("rule_id")
+  severity   Severity
+  timestamp  DateTime
+  entity     String
+  eventIds   String[] @map("event_ids")
+  message    String
+  count      Int?
+  incidentId String   @map("incident_id")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  incident Incident @relation(fields: [incidentId], references: [incidentId])
+
+  @@index([incidentId])
+  @@map("alerts")
+}
+
+// AI (or template-degraded) incident summary — Day 8. Schema lands now so the
+// Day 7 migration is the only one needed for the relational side of the plan.
+model Summary {
+  incidentId         String     @id @map("incident_id")
+  summary            String
+  iocs               String[]
+  recommendedActions String[]   @map("recommended_actions")
+  generatedBy        Summarizer @map("generated_by")
+  generatedAt        DateTime   @map("generated_at")
+
+  incident Incident @relation(fields: [incidentId], references: [incidentId])
+
+  @@map("summaries")
+}
