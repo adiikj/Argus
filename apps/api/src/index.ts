@@ -19,7 +19,7 @@ import {
   searchEvents,
 } from './storage/index.js';
 import { createRuleEngine, RULES, SeenEventIds } from './detection/index.js';
-import { createBus, type Bus } from './bus/index.js';
+import { createBus, HotEntities, type Bus } from './bus/index.js';
 import { createRealtimeServer } from './realtime/index.js';
 import { createMetrics, type Metrics } from './metrics/index.js';
 import {
@@ -27,6 +27,7 @@ import {
   attachAlert,
   getIncidentDetail,
   getAlertsAndIncidentsForEvent,
+  CORRELATION_WINDOW_MS,
   type PrismaClient,
 } from './incident/index.js';
 import { selectProvider, startAiEngine } from './ai/index.js';
@@ -56,10 +57,14 @@ async function startParser(kafka: Kafka, producer: StreamProducer, m: Metrics): 
   });
 }
 
-// storage: events.normalized -> Elasticsearch (independent of detection, §4)
+// storage: events.normalized -> Elasticsearch (independent of detection, §4).
+// Also feeds the live pipeline view: only broadcasts for entities a rule has
+// actually fired on recently, so background noise doesn't flood the socket.
 async function startStorage(
   kafka: Kafka,
   esClient: ReturnType<typeof createEsClient>,
+  bus: Bus,
+  hotEntities: HotEntities,
   m: Metrics,
 ): Promise<void> {
   await subscribe(kafka, 'api-es-writer', TOPICS.EVENTS_NORMALIZED, async (value) => {
@@ -67,11 +72,18 @@ async function startStorage(
     await indexEvent(esClient, event);
     m.incr('eventsIndexed');
     log.debug({ eventId: event.eventId }, 'indexed normalized event');
+    if (hotEntities.isHot(event.sourceIp)) bus.emit('event.normalized', event);
   });
 }
 
 // detection: events.normalized -> rule engine -> alerts (independent of storage, §4)
-async function startDetection(kafka: Kafka, producer: StreamProducer, m: Metrics): Promise<void> {
+async function startDetection(
+  kafka: Kafka,
+  producer: StreamProducer,
+  bus: Bus,
+  hotEntities: HotEntities,
+  m: Metrics,
+): Promise<void> {
   const seenEventIds = new SeenEventIds(5 * 60 * 1000);
   const ruleEngine = createRuleEngine(RULES);
   await subscribe(kafka, 'api-detection', TOPICS.EVENTS_NORMALIZED, async (value) => {
@@ -81,6 +93,8 @@ async function startDetection(kafka: Kafka, producer: StreamProducer, m: Metrics
     for (const alert of ruleEngine.evaluate(event)) {
       await producer.send(TOPICS.ALERTS, alert.entity, alert);
       m.incr('alertsRaised');
+      hotEntities.markHot(alert.entity);
+      bus.emit('alert.raised', alert);
       log.info({ alert }, 'rule fired');
     }
   });
@@ -147,10 +161,11 @@ const prisma = createPrismaClient(config);
 
 const producer = await createProducer(kafka);
 const bus = createBus();
+const hotEntities = new HotEntities(CORRELATION_WINDOW_MS);
 
 await startParser(kafka, producer, metrics);
-await startStorage(kafka, esClient, metrics);
-await startDetection(kafka, producer, metrics);
+await startStorage(kafka, esClient, bus, hotEntities, metrics);
+await startDetection(kafka, producer, bus, hotEntities, metrics);
 await startIncident(kafka, prisma, bus, metrics);
 await startRealtime(bus, prisma, esClient, metrics);
 startAi(prisma, bus, metrics);

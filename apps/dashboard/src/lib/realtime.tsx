@@ -1,7 +1,7 @@
 'use client';
 
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
-import type { Alert, Incident, IncidentSummary } from '@argus/contracts';
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
+import type { Alert, Incident, IncidentSummary, NormalizedEvent } from '@argus/contracts';
 
 const WS_URL = process.env.NEXT_PUBLIC_WS_URL ?? 'ws://localhost:4100/ws';
 export const API_URL = WS_URL.replace(/^ws(s?):\/\//, 'http$1://').replace(/\/ws$/, '');
@@ -11,22 +11,39 @@ export interface IncidentRow {
   latestAlert: Alert;
 }
 
+export type PipelineStage = 'parser' | 'detection' | 'incident' | 'ai';
+
+export interface PipelineActivity {
+  id: string;
+  stage: PipelineStage;
+  entity: string;
+  label: string;
+  timestamp: string;
+}
+
 type WsMessage =
   | { type: 'incident.created' | 'incident.updated'; incident: Incident; latestAlert: Alert }
-  | { type: 'summary.ready'; summary: IncidentSummary };
+  | { type: 'summary.ready'; summary: IncidentSummary }
+  | { type: 'event.normalized'; event: NormalizedEvent }
+  | { type: 'alert.raised'; alert: Alert };
 
 interface RealtimeState {
   incidents: IncidentRow[];
   summaries: Record<string, IncidentSummary>;
   connected: boolean;
+  pipelineActivity: PipelineActivity[];
 }
 
 const RealtimeContext = createContext<RealtimeState | undefined>(undefined);
+
+const MAX_ACTIVITY = 50;
 
 export function RealtimeProvider({ children }: { children: ReactNode }) {
   const [incidents, setIncidents] = useState<IncidentRow[]>([]);
   const [summaries, setSummaries] = useState<Record<string, IncidentSummary>>({});
   const [connected, setConnected] = useState(false);
+  const [pipelineActivity, setPipelineActivity] = useState<PipelineActivity[]>([]);
+  const activityCounter = useRef(0);
 
   useEffect(() => {
     const socket = new WebSocket(WS_URL);
@@ -35,10 +52,60 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
     socket.addEventListener('message', (event) => {
       const payload = JSON.parse(event.data as string) as WsMessage;
 
-      if (payload.type === 'summary.ready') {
-        setSummaries((prev) => ({ ...prev, [payload.summary.incidentId]: payload.summary }));
+      const pushActivity = (
+        stage: PipelineStage,
+        entity: string,
+        label: string,
+        timestamp: string,
+      ): void => {
+        activityCounter.current += 1;
+        const entry: PipelineActivity = {
+          id: `${stage}-${activityCounter.current}`,
+          stage,
+          entity,
+          label,
+          timestamp,
+        };
+        setPipelineActivity((prev) => [entry, ...prev].slice(0, MAX_ACTIVITY));
+      };
+
+      if (payload.type === 'event.normalized') {
+        pushActivity(
+          'parser',
+          payload.event.sourceIp,
+          `normalized (${payload.event.source})`,
+          payload.event.timestamp,
+        );
         return;
       }
+
+      if (payload.type === 'alert.raised') {
+        pushActivity(
+          'detection',
+          payload.alert.entity,
+          `${payload.alert.ruleId} fired`,
+          payload.alert.timestamp,
+        );
+        return;
+      }
+
+      if (payload.type === 'summary.ready') {
+        setSummaries((prev) => ({ ...prev, [payload.summary.incidentId]: payload.summary }));
+        pushActivity(
+          'ai',
+          payload.summary.incidentId.slice(0, 8),
+          'summary generated',
+          payload.summary.generatedAt,
+        );
+        return;
+      }
+
+      pushActivity(
+        'incident',
+        payload.incident.correlationKey,
+        payload.type === 'incident.created' ? 'incident opened' : 'incident updated',
+        payload.incident.updatedAt,
+      );
 
       setIncidents((prev) => {
         const withoutPrior = prev.filter(
@@ -59,7 +126,7 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
   }, []);
 
   return (
-    <RealtimeContext.Provider value={{ incidents, summaries, connected }}>
+    <RealtimeContext.Provider value={{ incidents, summaries, connected, pipelineActivity }}>
       {children}
     </RealtimeContext.Provider>
   );

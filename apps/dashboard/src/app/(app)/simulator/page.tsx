@@ -12,6 +12,8 @@ import {
 import { useScenarios, useFireScenario, type ScenarioInfo } from '@/lib/use-simulator';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { PipelineFlow } from '../_components/pipeline-flow';
+import { SystemActivity } from '../_components/system-activity';
 
 const SCENARIO_ICON: Record<string, LucideIcon> = {
   'brute-force': KeyRound,
@@ -28,9 +30,16 @@ export default function SimulatorPage() {
     <main className="mx-auto max-w-5xl px-6 py-8">
       <h1 className="mb-2 text-lg font-semibold text-text-primary">Attack Simulator</h1>
       <p className="mb-6 text-sm text-text-secondary">
-        Fire a scenario at the live pipeline — watch it become an alert, an incident, and an AI
-        summary on the Alerts page.
+        Fire a scenario at the live pipeline and watch it move, stage by stage, below — then check
+        the Alerts page for the incident and AI summary it produced.
       </p>
+
+      <div className="mb-6 grid gap-4 lg:grid-cols-3">
+        <div className="lg:col-span-2">
+          <PipelineFlow />
+        </div>
+        <SystemActivity />
+      </div>
 
       {isLoading && <p className="text-sm text-text-secondary">Loading scenarios…</p>}
       {isError && (

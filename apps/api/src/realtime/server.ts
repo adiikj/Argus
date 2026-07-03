@@ -71,6 +71,8 @@ export async function createRealtimeServer(bus: Bus, port: number, opts: Realtim
   bus.on('incident.created', broadcastIncident('incident.created'));
   bus.on('incident.updated', broadcastIncident('incident.updated'));
   bus.on('summary.ready', (summary: IncidentSummary) => send({ type: 'summary.ready', summary }));
+  bus.on('event.normalized', (event: NormalizedEvent) => send({ type: 'event.normalized', event }));
+  bus.on('alert.raised', (alert: Alert) => send({ type: 'alert.raised', alert }));
 
   await app.listen({ port, host: '0.0.0.0' });
   return app;
