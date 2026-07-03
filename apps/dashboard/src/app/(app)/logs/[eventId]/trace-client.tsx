@@ -2,6 +2,7 @@
 
 import type { ReactNode } from 'react';
 import Link from 'next/link';
+import { motion } from 'framer-motion';
 import { ArrowLeft } from 'lucide-react';
 import { useEventTrace } from '@/lib/use-event-trace';
 import { Badge } from '@/components/ui/badge';
@@ -16,15 +17,22 @@ function Stage({
   title,
   reached,
   last,
+  delay,
   children,
 }: {
   title: string;
   reached: boolean;
   last?: boolean;
+  delay: number;
   children?: ReactNode;
 }) {
   return (
-    <div className="flex gap-4">
+    <motion.div
+      className="flex gap-4"
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3, delay, ease: [0.16, 1, 0.3, 1] }}
+    >
       <div className="flex flex-col items-center">
         <span
           className={cn(
@@ -49,15 +57,28 @@ function Stage({
         </p>
         <div className="mt-2">{children}</div>
       </div>
-    </div>
+    </motion.div>
   );
 }
 
 export function TraceClient({ eventId }: { eventId: string }) {
-  const { data, isLoading } = useEventTrace(eventId);
+  const { data, isLoading, isError } = useEventTrace(eventId);
 
-  if (isLoading || !data) {
+  if (isLoading) {
     return <div className="px-6 py-8 text-sm text-text-secondary">Tracing event…</div>;
+  }
+
+  if (isError || !data) {
+    return (
+      <div className="flex min-h-[calc(100vh-4rem)] flex-col items-center justify-center gap-3 px-6 text-center">
+        <p className="text-sm text-text-secondary">
+          Couldn&apos;t reach the api to trace this event.
+        </p>
+        <Link href="/logs" className="text-xs text-accent hover:underline">
+          ← back to log explorer
+        </Link>
+      </div>
+    );
   }
 
   const { event, alerts, incidents } = data;
@@ -75,7 +96,7 @@ export function TraceClient({ eventId }: { eventId: string }) {
       <p className="mb-1 font-mono text-xs text-text-secondary">{eventId}</p>
       <h1 className="mb-6 text-lg font-semibold text-text-primary">Pipeline trace</h1>
 
-      <Stage title="Normalized" reached={!!event}>
+      <Stage title="Normalized" reached={!!event} delay={0}>
         {event ? (
           <Card>
             <CardContent className="space-y-1 p-4 font-mono text-xs text-text-secondary">
@@ -91,7 +112,7 @@ export function TraceClient({ eventId }: { eventId: string }) {
         )}
       </Stage>
 
-      <Stage title="Detected" reached={alerts.length > 0}>
+      <Stage title="Detected" reached={alerts.length > 0} delay={0.12}>
         {alerts.length > 0 ? (
           <div className="flex flex-col gap-2">
             {alerts.map((alert) => (
@@ -111,7 +132,7 @@ export function TraceClient({ eventId }: { eventId: string }) {
         )}
       </Stage>
 
-      <Stage title="Correlated" reached={incidents.length > 0} last>
+      <Stage title="Correlated" reached={incidents.length > 0} delay={0.24} last>
         {incidents.length > 0 ? (
           <div className="flex flex-col gap-2">
             {incidents.map((incident) => (

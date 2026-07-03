@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { motion } from 'framer-motion';
 import { ArrowLeft } from 'lucide-react';
 import { useIncidentDetail } from '@/lib/use-incident-detail';
 import { Badge } from '@/components/ui/badge';
@@ -9,6 +10,14 @@ import { Separator } from '@/components/ui/separator';
 
 function formatDateTime(iso: string): string {
   return new Date(iso).toLocaleString(undefined, { hour12: false });
+}
+
+function fadeIn(delay: number) {
+  return {
+    initial: { opacity: 0, y: 8 },
+    animate: { opacity: 1, y: 0 },
+    transition: { duration: 0.3, delay, ease: [0.16, 1, 0.3, 1] as const },
+  };
 }
 
 export function IncidentDetailClient({ id }: { id: string }) {
@@ -44,7 +53,7 @@ export function IncidentDetailClient({ id }: { id: string }) {
         back to alerts
       </Link>
 
-      <div className="mb-6">
+      <motion.div className="mb-6" {...fadeIn(0)}>
         <div className="mb-2 flex items-center gap-2">
           <Badge variant={incident.severity}>{incident.severity}</Badge>
           <Badge variant="outline">{incident.status}</Badge>
@@ -55,88 +64,94 @@ export function IncidentDetailClient({ id }: { id: string }) {
         <p className="mt-1 text-xs text-text-secondary">
           opened {formatDateTime(incident.createdAt)} · updated {formatDateTime(incident.updatedAt)}
         </p>
-      </div>
+      </motion.div>
 
-      <Card className="mb-6">
-        <CardHeader>
-          <CardTitle>AI summary</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {summary ? (
-            <div className="space-y-4">
-              <div className="flex items-start gap-2">
-                <Badge className="mt-0.5 shrink-0">{summary.generatedBy}</Badge>
-                <p className="text-sm leading-relaxed text-text-primary">{summary.summary}</p>
-              </div>
-              {summary.iocs.length > 0 && (
-                <div>
-                  <p className="mb-1.5 font-mono text-[10px] uppercase tracking-wider text-text-secondary">
-                    Indicators
-                  </p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {summary.iocs.map((ioc) => (
-                      <span
-                        key={ioc}
-                        className="rounded bg-bg-elevated px-2 py-0.5 font-mono text-xs text-text-primary"
-                      >
-                        {ioc}
-                      </span>
-                    ))}
+      <motion.div {...fadeIn(0.08)}>
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle>AI summary</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {summary ? (
+              <div className="space-y-4">
+                <div className="flex items-start gap-2">
+                  <Badge className="mt-0.5 shrink-0">{summary.generatedBy}</Badge>
+                  <p className="text-sm leading-relaxed text-text-primary">{summary.summary}</p>
+                </div>
+                {summary.iocs.length > 0 && (
+                  <div>
+                    <p className="mb-1.5 font-mono text-[10px] uppercase tracking-wider text-text-secondary">
+                      Indicators
+                    </p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {summary.iocs.map((ioc) => (
+                        <span
+                          key={ioc}
+                          className="rounded bg-bg-elevated px-2 py-0.5 font-mono text-xs text-text-primary"
+                        >
+                          {ioc}
+                        </span>
+                      ))}
+                    </div>
                   </div>
-                </div>
-              )}
-              {summary.recommendedActions.length > 0 && (
-                <div>
-                  <p className="mb-1.5 font-mono text-[10px] uppercase tracking-wider text-text-secondary">
-                    Recommended actions
-                  </p>
-                  <ul className="list-inside list-disc space-y-1 text-sm text-text-secondary">
-                    {summary.recommendedActions.map((action) => (
-                      <li key={action}>{action}</li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-            </div>
-          ) : (
-            <p className="text-sm text-text-secondary">
-              No summary yet — one generates shortly after the incident settles.
-            </p>
-          )}
-        </CardContent>
-      </Card>
+                )}
+                {summary.recommendedActions.length > 0 && (
+                  <div>
+                    <p className="mb-1.5 font-mono text-[10px] uppercase tracking-wider text-text-secondary">
+                      Recommended actions
+                    </p>
+                    <ul className="list-inside list-disc space-y-1 text-sm text-text-secondary">
+                      {summary.recommendedActions.map((action) => (
+                        <li key={action}>{action}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <p className="text-sm text-text-secondary">
+                No summary yet — one generates shortly after the incident settles.
+              </p>
+            )}
+          </CardContent>
+        </Card>
+      </motion.div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>
-            Timeline · {alerts.length} alert{alerts.length === 1 ? '' : 's'}
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="p-0">
-          <ul>
-            {alerts.map((alert, i) => (
-              <li key={alert.alertId}>
-                {i > 0 && <Separator />}
-                <div className="flex items-center gap-3 px-4 py-3">
-                  <Badge variant={alert.severity}>{alert.severity}</Badge>
-                  <span className="shrink-0 rounded bg-bg-elevated px-2 py-0.5 font-mono text-[11px] text-text-secondary">
-                    {alert.ruleId}
-                  </span>
-                  <span className="flex-1 truncate text-sm text-text-primary">{alert.message}</span>
-                  {alert.count !== undefined && (
-                    <span className="shrink-0 font-mono text-xs text-text-secondary">
-                      ×{alert.count}
+      <motion.div {...fadeIn(0.16)}>
+        <Card>
+          <CardHeader>
+            <CardTitle>
+              Timeline · {alerts.length} alert{alerts.length === 1 ? '' : 's'}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            <ul>
+              {alerts.map((alert, i) => (
+                <li key={alert.alertId}>
+                  {i > 0 && <Separator />}
+                  <div className="flex items-center gap-3 px-4 py-3">
+                    <Badge variant={alert.severity}>{alert.severity}</Badge>
+                    <span className="shrink-0 rounded bg-bg-elevated px-2 py-0.5 font-mono text-[11px] text-text-secondary">
+                      {alert.ruleId}
                     </span>
-                  )}
-                  <span className="shrink-0 font-mono text-xs text-text-secondary tabular-nums">
-                    {formatDateTime(alert.timestamp)}
-                  </span>
-                </div>
-              </li>
-            ))}
-          </ul>
-        </CardContent>
-      </Card>
+                    <span className="flex-1 truncate text-sm text-text-primary">
+                      {alert.message}
+                    </span>
+                    {alert.count !== undefined && (
+                      <span className="shrink-0 font-mono text-xs text-text-secondary">
+                        ×{alert.count}
+                      </span>
+                    )}
+                    <span className="shrink-0 font-mono text-xs text-text-secondary tabular-nums">
+                      {formatDateTime(alert.timestamp)}
+                    </span>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </CardContent>
+        </Card>
+      </motion.div>
     </main>
   );
 }

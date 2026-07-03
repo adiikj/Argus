@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import { motion } from 'framer-motion';
 import { useEvents } from '@/lib/use-events';
 import { Card } from '@/components/ui/card';
 
@@ -14,7 +15,11 @@ function formatTime(iso: string): string {
 export default function LogsPage() {
   const [q, setQ] = useState('');
   const [source, setSource] = useState('');
-  const { data: events, isLoading } = useEvents({
+  const {
+    data: events,
+    isLoading,
+    isError,
+  } = useEvents({
     q: q || undefined,
     source: source || undefined,
     limit: 100,
@@ -50,11 +55,22 @@ export default function LogsPage() {
 
       {isLoading ? (
         <p className="text-sm text-text-secondary">Loading…</p>
+      ) : isError ? (
+        <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed border-border-subtle py-24 text-center">
+          <p className="text-sm text-text-secondary">
+            Couldn&apos;t reach the api — search is unavailable right now.
+          </p>
+        </div>
       ) : events && events.length > 0 ? (
         <Card className="overflow-hidden">
           <ul className="divide-y divide-border-subtle">
-            {events.map((event) => (
-              <li key={event.eventId}>
+            {events.map((event, i) => (
+              <motion.li
+                key={event.eventId}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: 0.15, delay: Math.min(i, 20) * 0.012 }}
+              >
                 <Link
                   href={`/logs/${event.eventId}`}
                   className="flex items-center gap-3 px-4 py-2.5 text-sm transition-colors hover:bg-bg-elevated"
@@ -72,7 +88,7 @@ export default function LogsPage() {
                     {formatTime(event.timestamp)}
                   </span>
                 </Link>
-              </li>
+              </motion.li>
             ))}
           </ul>
         </Card>
