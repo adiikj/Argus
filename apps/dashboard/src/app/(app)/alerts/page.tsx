@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import Link from 'next/link';
 import { AnimatePresence, motion } from 'framer-motion';
 import type { Severity } from '@argus/contracts';
 import { useRealtime } from '@/lib/realtime';
@@ -97,34 +98,37 @@ export default function AlertsPage() {
                   exit={{ opacity: 0 }}
                   transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
                 >
-                  <Card className="flex flex-col gap-2 px-4 py-3">
-                    <div className="flex items-center gap-4">
-                      <Badge variant={incident.severity}>{incident.severity}</Badge>
-                      <span className="hidden shrink-0 rounded bg-bg-elevated px-2 py-0.5 font-mono text-[11px] text-text-secondary sm:inline">
-                        {latestAlert.ruleId}
-                      </span>
-                      <span className="shrink-0 font-mono text-sm text-text-secondary">
-                        {incident.correlationKey}
-                      </span>
-                      <span className="flex-1 truncate text-sm text-text-primary">
-                        {latestAlert.message}
-                      </span>
-                      <span className="shrink-0 font-mono text-xs text-text-secondary">
-                        {incident.alertIds.length} alert{incident.alertIds.length === 1 ? '' : 's'}
-                      </span>
-                      <span className="shrink-0 font-mono text-xs text-text-secondary tabular-nums">
-                        {formatTime(incident.updatedAt)}
-                      </span>
-                    </div>
-                    {summary && (
-                      <p className="flex items-start gap-2 pl-1 text-xs text-text-secondary">
-                        <span className="mt-0.5 shrink-0 rounded bg-bg-elevated px-1.5 py-0.5 font-mono text-[10px] uppercase text-accent">
-                          {summary.generatedBy}
+                  <Link href={`/incidents/${incident.incidentId}`}>
+                    <Card className="flex flex-col gap-2 px-4 py-3 transition-colors hover:border-accent/40">
+                      <div className="flex items-center gap-4">
+                        <Badge variant={incident.severity}>{incident.severity}</Badge>
+                        <span className="hidden shrink-0 rounded bg-bg-elevated px-2 py-0.5 font-mono text-[11px] text-text-secondary sm:inline">
+                          {latestAlert.ruleId}
                         </span>
-                        <span>{summary.summary}</span>
-                      </p>
-                    )}
-                  </Card>
+                        <span className="shrink-0 font-mono text-sm text-text-secondary">
+                          {incident.correlationKey}
+                        </span>
+                        <span className="flex-1 truncate text-sm text-text-primary">
+                          {latestAlert.message}
+                        </span>
+                        <span className="shrink-0 font-mono text-xs text-text-secondary">
+                          {incident.alertIds.length} alert
+                          {incident.alertIds.length === 1 ? '' : 's'}
+                        </span>
+                        <span className="shrink-0 font-mono text-xs text-text-secondary tabular-nums">
+                          {formatTime(incident.updatedAt)}
+                        </span>
+                      </div>
+                      {summary && (
+                        <p className="flex items-start gap-2 pl-1 text-xs text-text-secondary">
+                          <span className="mt-0.5 shrink-0 rounded bg-bg-elevated px-1.5 py-0.5 font-mono text-[10px] uppercase text-accent">
+                            {summary.generatedBy}
+                          </span>
+                          <span>{summary.summary}</span>
+                        </p>
+                      )}
+                    </Card>
+                  </Link>
                 </motion.li>
               );
             })}

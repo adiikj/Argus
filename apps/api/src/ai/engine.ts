@@ -1,12 +1,12 @@
 import type { Logger } from '@argus/logger';
 import { IncidentSummary, type Incident } from '@argus/contracts';
 import type { PrismaClient } from '../incident/index.js';
+import { loadIncidentWithAlerts } from '../incident/index.js';
 import type { Bus } from '../bus/index.js';
 import type { LLMProvider } from './provider.js';
 import { templateProvider } from './providers/template.js';
 import { createSummaryQueue } from './queue.js';
 import { shouldResummarize, type SummarizedState } from './resummarize.js';
-import { loadIncidentContext } from './context.js';
 
 const CONCURRENCY = 2;
 const DEBOUNCE_MS = 4000;
@@ -26,7 +26,7 @@ export function startAiEngine({ prisma, bus, provider, log }: AiEngineDeps): voi
     debounceMs: DEBOUNCE_MS,
     run: async (incidentId) => {
       try {
-        const context = await loadIncidentContext(prisma, incidentId);
+        const context = await loadIncidentWithAlerts(prisma, incidentId);
         if (!context) return;
 
         let generatedBy: 'llm' | 'template' = provider.name;

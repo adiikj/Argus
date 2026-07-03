@@ -2,9 +2,11 @@ import Fastify from 'fastify';
 import websocketPlugin, { type WebSocket } from '@fastify/websocket';
 import type { IncidentSummary } from '@argus/contracts';
 import type { Bus, IncidentEvent } from '../bus/index.js';
+import type { IncidentDetail } from '../incident/index.js';
 
 export interface RealtimeOptions {
   getMetrics?: () => unknown;
+  getIncidentDetail?: (id: string) => Promise<IncidentDetail | undefined>;
 }
 
 export async function createRealtimeServer(bus: Bus, port: number, opts: RealtimeOptions = {}) {
@@ -24,6 +26,16 @@ export async function createRealtimeServer(bus: Bus, port: number, opts: Realtim
 
   app.get('/healthz', async () => ({ status: 'ok', clients: sockets.size }));
   app.get('/metrics', async () => opts.getMetrics?.() ?? {});
+
+  app.get('/incidents/:id', async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const detail = await opts.getIncidentDetail?.(id);
+    if (!detail) {
+      reply.code(404);
+      return { error: 'incident not found' };
+    }
+    return detail;
+  });
 
   const send = (payload: unknown): void => {
     const json = JSON.stringify(payload);

@@ -27,7 +27,7 @@ export function NavSidebar() {
 
       <nav className="flex flex-1 flex-col gap-1 p-3">
         {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
-          const active = pathname === href;
+          const active = pathname === href || pathname.startsWith(`${href}/`);
           return (
             <Link
               key={href}

@@ -16,7 +16,12 @@ import { createRuleEngine, RULES, SeenEventIds } from './detection/index.js';
 import { createBus, type Bus } from './bus/index.js';
 import { createRealtimeServer } from './realtime/index.js';
 import { createMetrics, type Metrics } from './metrics/index.js';
-import { createPrismaClient, attachAlert, type PrismaClient } from './incident/index.js';
+import {
+  createPrismaClient,
+  attachAlert,
+  getIncidentDetail,
+  type PrismaClient,
+} from './incident/index.js';
 import { selectProvider, startAiEngine } from './ai/index.js';
 
 const config = loadConfig();
@@ -96,9 +101,12 @@ async function startIncident(
 // realtime: internal bus -> WS (independent of storage/detection, §4/§9).
 // Listens to the bus, not Kafka directly — the incident engine is the one
 // Kafka consumer on `alerts`, per §7's wiring.
-async function startRealtime(bus: Bus, m: Metrics): Promise<void> {
-  await createRealtimeServer(bus, config.PORT, { getMetrics: () => m.snapshot() });
-  log.info({ port: config.PORT }, 'realtime WS + /healthz + /metrics listening');
+async function startRealtime(bus: Bus, prisma: PrismaClient, m: Metrics): Promise<void> {
+  await createRealtimeServer(bus, config.PORT, {
+    getMetrics: () => m.snapshot(),
+    getIncidentDetail: (id) => getIncidentDetail(prisma, id),
+  });
+  log.info({ port: config.PORT }, 'realtime WS + /healthz + /metrics + /incidents/:id listening');
 }
 
 // ai: incident.created/updated -> LLMProvider (or template fallback) -> summaries, on the bus (§8)
@@ -124,5 +132,5 @@ await startParser(kafka, producer, metrics);
 await startStorage(kafka, esClient, metrics);
 await startDetection(kafka, producer, metrics);
 await startIncident(kafka, prisma, bus, metrics);
-await startRealtime(bus, metrics);
+await startRealtime(bus, prisma, metrics);
 startAi(prisma, bus, metrics);
