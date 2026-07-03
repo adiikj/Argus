@@ -3,6 +3,7 @@
 import { useQuery } from '@tanstack/react-query';
 import type { NormalizedEvent } from '@argus/contracts';
 import { API_URL } from './realtime';
+import { authFetch } from './auth';
 
 export interface EventSearchParams {
   q?: string;
@@ -16,7 +17,7 @@ async function fetchEvents(params: EventSearchParams): Promise<NormalizedEvent[]
   if (params.source) search.set('source', params.source);
   if (params.limit) search.set('limit', String(params.limit));
 
-  const res = await fetch(`${API_URL}/events?${search.toString()}`, { cache: 'no-store' });
+  const res = await authFetch(`${API_URL}/events?${search.toString()}`, { cache: 'no-store' });
   if (!res.ok) throw new Error(`events request failed: ${res.status}`);
   const body = (await res.json()) as { events: NormalizedEvent[] };
   return body.events;

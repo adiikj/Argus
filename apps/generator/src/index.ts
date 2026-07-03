@@ -39,7 +39,12 @@ setInterval(() => {
 }, NOISE_INTERVAL_MS);
 
 // layer 2: the /simulate trigger API
-await createSimulatorServer({ port: config.GENERATOR_PORT, log, runScenario });
+await createSimulatorServer({
+  port: config.GENERATOR_PORT,
+  log,
+  runScenario,
+  corsOrigin: config.CORS_ORIGIN,
+});
 log.info({ port: config.GENERATOR_PORT, scenarios: SCENARIO_NAMES }, 'simulator API listening');
 
 // the lazy path: a scripted timeline shortly after boot, so an unattended

@@ -2,6 +2,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { API_URL } from './realtime';
+import { authFetch } from './auth';
 
 export interface ConsumerLag {
   groupId: string;
@@ -16,7 +17,7 @@ export interface SystemHealth {
 }
 
 async function fetchSystemHealth(): Promise<SystemHealth> {
-  const res = await fetch(`${API_URL}/system/health`, { cache: 'no-store' });
+  const res = await authFetch(`${API_URL}/system/health`, { cache: 'no-store' });
   if (!res.ok) throw new Error(`system health request failed: ${res.status}`);
   return (await res.json()) as SystemHealth;
 }

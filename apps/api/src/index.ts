@@ -32,6 +32,7 @@ import {
 } from './incident/index.js';
 import { selectProvider, startAiEngine } from './ai/index.js';
 import { getSystemHealth } from './system/index.js';
+import type { AuthOptions } from './auth/index.js';
 
 const config = loadConfig();
 const log = createLogger({ name: 'api', level: config.LOG_LEVEL });
@@ -129,6 +130,7 @@ async function startRealtime(
   prisma: PrismaClient,
   esClient: ReturnType<typeof createEsClient>,
   m: Metrics,
+  auth: AuthOptions | undefined,
 ): Promise<void> {
   await createRealtimeServer(bus, config.PORT, {
     getMetrics: () => m.snapshot(),
@@ -142,6 +144,8 @@ async function startRealtime(
       return { eventId, event, alerts, incidents };
     },
     getSystemHealth: () => getSystemHealth(kafka, esClient, prisma),
+    auth,
+    corsOrigin: config.CORS_ORIGIN,
   });
   log.info({ port: config.PORT }, 'realtime WS + REST (incidents, events, trace) listening');
 }
@@ -170,5 +174,9 @@ await startParser(kafka, producer, metrics);
 await startStorage(kafka, esClient, bus, hotEntities, metrics);
 await startDetection(kafka, producer, bus, hotEntities, metrics);
 await startIncident(kafka, prisma, bus, metrics);
-await startRealtime(kafka, bus, prisma, esClient, metrics);
+const auth: AuthOptions | undefined = config.SITE_PASSWORD
+  ? { sitePassword: config.SITE_PASSWORD, authSecret: config.AUTH_SECRET ?? config.SITE_PASSWORD }
+  : undefined;
+
+await startRealtime(kafka, bus, prisma, esClient, metrics, auth);
 startAi(prisma, bus, metrics);

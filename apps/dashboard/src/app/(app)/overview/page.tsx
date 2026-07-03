@@ -22,6 +22,7 @@ import { useMetricsHistory } from '@/lib/use-metrics-history';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
+import { AttackerGeoMap } from '../_components/attacker-geo-map';
 
 const RULE_COLORS = [
   'var(--color-accent)',
@@ -355,6 +356,10 @@ export default function OverviewPage() {
       </div>
 
       <motion.div className="mt-4" {...fadeIn(0.4)}>
+        <AttackerGeoMap />
+      </motion.div>
+
+      <motion.div className="mt-4" {...fadeIn(0.48)}>
         <Card>
           <CardHeader>
             <CardTitle>Activity by hour</CardTitle>

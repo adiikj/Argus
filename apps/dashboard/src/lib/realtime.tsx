@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import type { Alert, Incident, IncidentSummary, NormalizedEvent } from '@argus/contracts';
+import { getToken } from './auth';
 
 const WS_URL = process.env.NEXT_PUBLIC_WS_URL ?? 'ws://localhost:4100/ws';
 export const API_URL = WS_URL.replace(/^ws(s?):\/\//, 'http$1://').replace(/\/ws$/, '');
@@ -56,7 +57,9 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
   const activityCounter = useRef(0);
 
   useEffect(() => {
-    const socket = new WebSocket(WS_URL);
+    const token = getToken();
+    const url = token ? `${WS_URL}?token=${encodeURIComponent(token)}` : WS_URL;
+    const socket = new WebSocket(url);
     socket.addEventListener('open', () => setConnected(true));
     socket.addEventListener('close', () => setConnected(false));
     socket.addEventListener('message', (event) => {

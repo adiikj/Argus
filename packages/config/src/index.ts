@@ -32,6 +32,14 @@ const EnvSchema = z.object({
     .enum(['true', 'false'])
     .default('false')
     .transform((v) => v === 'true'),
+
+  // single shared site password, not user accounts — leave blank to run with no gate
+  // (same "runs with zero keys" degradation as the LLM providers)
+  SITE_PASSWORD: z.string().optional(),
+  AUTH_SECRET: z.string().optional(),
+
+  // '*' for local dev; set to the real dashboard hostname once one exists (post-deploy)
+  CORS_ORIGIN: z.string().default('*'),
 });
 
 export type AppConfig = z.infer<typeof EnvSchema>;

@@ -1,8 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { ChevronRight, ExternalLink } from 'lucide-react';
+import { ArrowDownUp, ChevronRight, ExternalLink, Star, X } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useEvents } from '@/lib/use-events';
 import { Card } from '@/components/ui/card';
@@ -15,10 +15,33 @@ function formatTime(iso: string): string {
   return new Date(iso).toLocaleString(undefined, { hour12: false });
 }
 
+interface SavedSearch {
+  q: string;
+  source: string;
+}
+
+const SAVED_SEARCHES_KEY = 'argus_saved_searches';
+const MAX_SAVED_SEARCHES = 8;
+
+function loadSavedSearches(): SavedSearch[] {
+  try {
+    const raw = window.localStorage.getItem(SAVED_SEARCHES_KEY);
+    return raw ? (JSON.parse(raw) as SavedSearch[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+function savedSearchLabel(s: SavedSearch): string {
+  return [s.q, s.source].filter(Boolean).join(' · ') || 'all events';
+}
+
 export default function LogsPage() {
   const [q, setQ] = useState('');
   const [source, setSource] = useState('');
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [sortDir, setSortDir] = useState<'desc' | 'asc'>('desc');
+  const [savedSearches, setSavedSearches] = useState<SavedSearch[]>([]);
   const {
     data: events,
     isLoading,
@@ -29,6 +52,18 @@ export default function LogsPage() {
     limit: 100,
   });
 
+  useEffect(() => setSavedSearches(loadSavedSearches()), []);
+
+  const sortedEvents = useMemo(() => {
+    if (!events) return events;
+    const copy = [...events];
+    copy.sort((a, b) => {
+      const diff = new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime();
+      return sortDir === 'asc' ? diff : -diff;
+    });
+    return copy;
+  }, [events, sortDir]);
+
   const toggle = (eventId: string): void => {
     setExpanded((prev) => {
       const next = new Set(prev);
@@ -36,6 +71,26 @@ export default function LogsPage() {
       else next.add(eventId);
       return next;
     });
+  };
+
+  const canSaveCurrent =
+    (q || source) && !savedSearches.some((s) => s.q === q && s.source === source);
+
+  const saveCurrentSearch = (): void => {
+    const next = [...savedSearches, { q, source }].slice(-MAX_SAVED_SEARCHES);
+    setSavedSearches(next);
+    window.localStorage.setItem(SAVED_SEARCHES_KEY, JSON.stringify(next));
+  };
+
+  const removeSavedSearch = (index: number): void => {
+    const next = savedSearches.filter((_, i) => i !== index);
+    setSavedSearches(next);
+    window.localStorage.setItem(SAVED_SEARCHES_KEY, JSON.stringify(next));
+  };
+
+  const applySavedSearch = (s: SavedSearch): void => {
+    setQ(s.q);
+    setSource(s.source);
   };
 
   return (
@@ -64,7 +119,53 @@ export default function LogsPage() {
             </option>
           ))}
         </select>
+        <button
+          type="button"
+          disabled={!canSaveCurrent}
+          onClick={saveCurrentSearch}
+          title="Save this search"
+          className="flex shrink-0 items-center gap-1.5 rounded-md border border-border-subtle bg-bg-panel px-3 py-1.5 font-mono text-xs text-text-secondary transition-colors hover:border-accent/40 hover:text-text-primary disabled:pointer-events-none disabled:opacity-40"
+        >
+          <Star className="h-3.5 w-3.5" strokeWidth={1.8} />
+          Save
+        </button>
+        <button
+          type="button"
+          onClick={() => setSortDir((d) => (d === 'desc' ? 'asc' : 'desc'))}
+          title="Toggle sort order"
+          className="flex shrink-0 items-center gap-1.5 rounded-md border border-border-subtle bg-bg-panel px-3 py-1.5 font-mono text-xs text-text-secondary transition-colors hover:border-accent/40 hover:text-text-primary"
+        >
+          <ArrowDownUp className="h-3.5 w-3.5" strokeWidth={1.8} />
+          {sortDir === 'desc' ? 'Newest' : 'Oldest'}
+        </button>
       </div>
+
+      {savedSearches.length > 0 && (
+        <div className="mb-4 flex flex-wrap items-center gap-1.5">
+          {savedSearches.map((s, i) => (
+            <span
+              key={`${s.q}-${s.source}-${i}`}
+              className="flex items-center gap-1.5 rounded-md border border-border-subtle bg-bg-panel py-1 pr-1 pl-2.5 font-mono text-xs text-text-secondary"
+            >
+              <button
+                type="button"
+                onClick={() => applySavedSearch(s)}
+                className="hover:text-text-primary"
+              >
+                {savedSearchLabel(s)}
+              </button>
+              <button
+                type="button"
+                onClick={() => removeSavedSearch(i)}
+                title="Remove"
+                className="rounded p-0.5 hover:bg-bg-elevated hover:text-severity-critical"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
 
       {isLoading ? (
         <Card className="overflow-hidden">
@@ -85,10 +186,10 @@ export default function LogsPage() {
             Couldn&apos;t reach the api — search is unavailable right now.
           </p>
         </div>
-      ) : events && events.length > 0 ? (
+      ) : sortedEvents && sortedEvents.length > 0 ? (
         <Card className="overflow-hidden">
           <ul className="divide-y divide-border-subtle">
-            {events.map((event, i) => {
+            {sortedEvents.map((event, i) => {
               const isOpen = expanded.has(event.eventId);
               return (
                 <motion.li

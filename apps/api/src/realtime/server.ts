@@ -1,3 +1,4 @@
+import { timingSafeEqual } from 'node:crypto';
 import Fastify from 'fastify';
 import websocketPlugin, { type WebSocket } from '@fastify/websocket';
 import type { Alert, Incident, IncidentSummary, NormalizedEvent } from '@argus/contracts';
@@ -5,6 +6,21 @@ import type { Bus, IncidentEvent } from '../bus/index.js';
 import type { IncidentDetail } from '../incident/index.js';
 import type { EventSearchParams } from '../storage/index.js';
 import type { SystemHealth } from '../system/index.js';
+import { signToken, verifyToken, type AuthOptions } from '../auth/index.js';
+import { RateLimiter } from './rate-limit.js';
+
+const UNGATED_PATHS = ['/healthz', '/auth/login', '/auth/status'];
+
+// 40 immediate requests, refilling at 5/sec (300/min sustained) — comfortably
+// above normal dashboard polling (/metrics every 3s, /system/health every 5s
+// per open tab), but still a real ceiling against a hammering script.
+const REQUEST_LIMITER = new RateLimiter(40, 5);
+
+function safeEqual(a: string, b: string): boolean {
+  const bufA = Buffer.from(a);
+  const bufB = Buffer.from(b);
+  return bufA.length === bufB.length && timingSafeEqual(bufA, bufB);
+}
 
 export interface EventTrace {
   eventId: string;
@@ -19,14 +35,37 @@ export interface RealtimeOptions {
   searchEvents?: (params: EventSearchParams) => Promise<NormalizedEvent[]>;
   getEventTrace?: (eventId: string) => Promise<EventTrace>;
   getSystemHealth?: () => Promise<SystemHealth>;
+  auth?: AuthOptions;
+  corsOrigin?: string;
 }
 
 export async function createRealtimeServer(bus: Bus, port: number, opts: RealtimeOptions = {}) {
   const app = Fastify();
   await app.register(websocketPlugin);
 
+  const corsOrigin = opts.corsOrigin ?? '*';
   app.addHook('onRequest', async (_req, reply) => {
-    reply.header('access-control-allow-origin', '*');
+    reply.header('access-control-allow-origin', corsOrigin);
+  });
+
+  app.addHook('onRequest', async (req, reply) => {
+    if (req.url.startsWith('/healthz') || req.url.startsWith('/ws')) return;
+    if (!REQUEST_LIMITER.tryConsume(req.ip)) {
+      reply.code(429).send({ error: 'rate limited — try again shortly' });
+    }
+  });
+
+  app.addHook('onRequest', async (req, reply) => {
+    if (!opts.auth) return; // no SITE_PASSWORD configured — gate is a no-op
+    if (UNGATED_PATHS.some((path) => req.url.startsWith(path))) return;
+
+    const bearer = req.headers.authorization?.replace(/^Bearer\s+/i, '');
+    const queryToken = (req.query as { token?: string } | undefined)?.token;
+    const token = bearer ?? queryToken;
+
+    if (!token || !(await verifyToken(token, opts.auth.authSecret))) {
+      reply.code(401).send({ error: 'unauthorized' });
+    }
   });
 
   const sockets = new Set<WebSocket>();
@@ -37,6 +76,23 @@ export async function createRealtimeServer(bus: Bus, port: number, opts: Realtim
   });
 
   app.get('/healthz', async () => ({ status: 'ok', clients: sockets.size }));
+
+  app.get('/auth/status', async () => ({ required: Boolean(opts.auth) }));
+
+  app.post('/auth/login', async (req, reply) => {
+    if (!opts.auth) {
+      reply.code(404);
+      return { error: 'auth not configured' };
+    }
+    const { password } = (req.body ?? {}) as { password?: string };
+    if (!password || !safeEqual(password, opts.auth.sitePassword)) {
+      reply.code(401);
+      return { error: 'invalid password' };
+    }
+    const token = await signToken(opts.auth.authSecret);
+    return { token };
+  });
+
   app.get('/metrics', async () => opts.getMetrics?.() ?? {});
 
   app.get('/incidents/:id', async (req, reply) => {

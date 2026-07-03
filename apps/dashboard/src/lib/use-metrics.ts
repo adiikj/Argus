@@ -2,6 +2,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { API_URL } from './realtime';
+import { authFetch } from './auth';
 
 export interface Metrics {
   uptimeSeconds: number;
@@ -16,7 +17,7 @@ export interface Metrics {
 }
 
 async function fetchMetrics(): Promise<Metrics> {
-  const res = await fetch(`${API_URL}/metrics`, { cache: 'no-store' });
+  const res = await authFetch(`${API_URL}/metrics`, { cache: 'no-store' });
   if (!res.ok) throw new Error(`metrics request failed: ${res.status}`);
   return (await res.json()) as Metrics;
 }
