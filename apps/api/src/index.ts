@@ -17,6 +17,7 @@ import { createBus, type Bus } from './bus/index.js';
 import { createRealtimeServer } from './realtime/index.js';
 import { createMetrics, type Metrics } from './metrics/index.js';
 import { createPrismaClient, attachAlert, type PrismaClient } from './incident/index.js';
+import { selectProvider, startAiEngine } from './ai/index.js';
 
 const config = loadConfig();
 const log = createLogger({ name: 'api', level: config.LOG_LEVEL });
@@ -100,6 +101,14 @@ async function startRealtime(bus: Bus, m: Metrics): Promise<void> {
   log.info({ port: config.PORT }, 'realtime WS + /healthz + /metrics listening');
 }
 
+// ai: incident.created/updated -> LLMProvider (or template fallback) -> summaries, on the bus (§8)
+function startAi(prisma: PrismaClient, bus: Bus, m: Metrics): void {
+  const provider = selectProvider(config);
+  startAiEngine({ prisma, bus, provider, log });
+  bus.on('summary.ready', () => m.incr('summariesGenerated'));
+  log.info({ provider: provider.name }, 'ai summarization engine started');
+}
+
 const kafka = createKafkaClient(config);
 await ensureTopics(kafka);
 
@@ -116,5 +125,4 @@ await startStorage(kafka, esClient, metrics);
 await startDetection(kafka, producer, metrics);
 await startIncident(kafka, prisma, bus, metrics);
 await startRealtime(bus, metrics);
-
-// TODO: composition root — wire ai (Day 8), subscribing to the same bus events
+startAi(prisma, bus, metrics);

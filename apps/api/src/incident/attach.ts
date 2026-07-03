@@ -1,19 +1,7 @@
-import type { PrismaClient, Incident as IncidentRow } from '../../generated/prisma/index.js';
-import type { Alert, Incident } from '@argus/contracts';
+import type { PrismaClient } from '../../generated/prisma/index.js';
+import type { Alert } from '@argus/contracts';
 import { correlate, CORRELATION_WINDOW_MS, type CorrelationResult } from './correlate.js';
-
-function fromRow(row: IncidentRow): Incident {
-  return {
-    incidentId: row.incidentId,
-    correlationKey: row.correlationKey,
-    severity: row.severity,
-    status: row.status,
-    createdAt: row.createdAt.toISOString(),
-    updatedAt: row.updatedAt.toISOString(),
-    alertIds: row.alertIds,
-    eventIds: row.eventIds,
-  };
-}
+import { incidentRowToContract } from './mappers.js';
 
 // alerts -> incidents (§7): within one transaction, attach the alert to the
 // matching open incident (same entity, updated within the correlation
@@ -30,7 +18,7 @@ export async function attachAlert(prisma: PrismaClient, alert: Alert): Promise<C
       orderBy: { updatedAt: 'desc' },
     });
 
-    const { incident, isNew } = correlate(openRow ? fromRow(openRow) : undefined, alert);
+    const { incident, isNew } = correlate(openRow ? incidentRowToContract(openRow) : undefined, alert);
 
     if (isNew) {
       await tx.incident.create({

@@ -10,6 +10,7 @@ export interface MetricsSnapshot {
   alertsRaised: number;
   incidentsOpened: number;
   incidentsUpdated: number;
+  summariesGenerated: number;
 }
 
 type Counter = Exclude<keyof MetricsSnapshot, 'uptimeSeconds'>;
@@ -29,6 +30,7 @@ export function createMetrics(): Metrics {
     alertsRaised: 0,
     incidentsOpened: 0,
     incidentsUpdated: 0,
+    summariesGenerated: 0,
   };
 
   return {
