@@ -30,8 +30,9 @@ export async function createRealtimeServer(bus: Bus, port: number, opts: Realtim
     for (const socket of sockets) socket.send(json);
   };
 
-  const broadcastIncident = (type: 'incident.created' | 'incident.updated') => (event: IncidentEvent) =>
-    send({ type, ...event });
+  const broadcastIncident =
+    (type: 'incident.created' | 'incident.updated') => (event: IncidentEvent) =>
+      send({ type, ...event });
   bus.on('incident.created', broadcastIncident('incident.created'));
   bus.on('incident.updated', broadcastIncident('incident.updated'));
   bus.on('summary.ready', (summary: IncidentSummary) => send({ type: 'summary.ready', summary }));

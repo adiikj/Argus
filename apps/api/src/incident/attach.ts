@@ -18,7 +18,10 @@ export async function attachAlert(prisma: PrismaClient, alert: Alert): Promise<C
       orderBy: { updatedAt: 'desc' },
     });
 
-    const { incident, isNew } = correlate(openRow ? incidentRowToContract(openRow) : undefined, alert);
+    const { incident, isNew } = correlate(
+      openRow ? incidentRowToContract(openRow) : undefined,
+      alert,
+    );
 
     if (isNew) {
       await tx.incident.create({
