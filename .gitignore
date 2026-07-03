@@ -38,3 +38,4 @@ Thumbs.db
 #docs
 *.md
 !README.md
+/docs

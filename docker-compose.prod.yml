@@ -1,0 +1,146 @@
+# Production profile (architecture §16). Run alongside docker-compose.yml is
+# NOT the model here — this file is self-contained and replaces it in prod:
+#   docker compose -f docker-compose.prod.yml up -d --build
+#
+# Kafka/Elasticsearch/Postgres publish no ports at all — reachable only from
+# other containers on this compose network. Only cloudflared makes an
+# outbound connection to Cloudflare's edge; nothing needs an inbound port
+# opened on the host firewall. See docs/deployment.md for the full runbook.
+name: argus
+
+services:
+  kafka:
+    image: apache/kafka:3.9.1
+    container_name: argus-kafka
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      CLUSTER_ID: 5L6g3nShT-eMCtK--X86sw
+      KAFKA_LISTENERS: CONTROLLER://0.0.0.0:9093,INTERNAL://0.0.0.0:19092
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:19092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,INTERNAL:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'false'
+    volumes:
+      - kafka_data:/var/lib/kafka/data
+    healthcheck:
+      test:
+        [
+          'CMD-SHELL',
+          '/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:19092 >/dev/null 2>&1 || exit 1',
+        ]
+      interval: 10s
+      timeout: 10s
+      retries: 12
+      start_period: 20s
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.15.3
+    container_name: argus-elasticsearch
+    environment:
+      discovery.type: single-node
+      xpack.security.enabled: 'false'
+      ES_JAVA_OPTS: '-Xms1g -Xmx1g'
+      bootstrap.memory_lock: 'true'
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    volumes:
+      - es_data:/usr/share/elasticsearch/data
+    healthcheck:
+      test:
+        ['CMD-SHELL', 'curl -fs http://localhost:9200/_cluster/health >/dev/null 2>&1 || exit 1']
+      interval: 10s
+      timeout: 10s
+      retries: 12
+      start_period: 30s
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: argus-postgres
+    environment:
+      POSTGRES_USER: argus
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set a real password in .env.prod}
+      POSTGRES_DB: argus
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U argus -d argus']
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    container_name: argus-api
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: '4000'
+      KAFKA_BROKERS: kafka:19092
+      ES_NODE: http://elasticsearch:9200
+      POSTGRES_URL: postgresql://argus:${POSTGRES_PASSWORD:?set a real password in .env.prod}@postgres:5432/argus
+      STORAGE_PROFILE: full
+      LLM_PROVIDER: ${LLM_PROVIDER:-none}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+    depends_on:
+      kafka: { condition: service_healthy }
+      elasticsearch: { condition: service_healthy }
+      postgres: { condition: service_healthy }
+
+  generator:
+    build:
+      context: .
+      dockerfile: apps/generator/Dockerfile
+    container_name: argus-generator
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      GENERATOR_PORT: '4200'
+      KAFKA_BROKERS: kafka:19092
+      DEMO_MODE: ${DEMO_MODE:-true}
+    depends_on:
+      kafka: { condition: service_healthy }
+
+  dashboard:
+    build:
+      context: .
+      dockerfile: apps/dashboard/Dockerfile
+      args:
+        # baked into the client bundle at build time — see JOURNAL.md.
+        # Point these at whatever hostnames the tunnel routes to (docs/deployment.md).
+        NEXT_PUBLIC_WS_URL: ${NEXT_PUBLIC_WS_URL}
+        NEXT_PUBLIC_GENERATOR_URL: ${NEXT_PUBLIC_GENERATOR_URL}
+    container_name: argus-dashboard
+    restart: unless-stopped
+    depends_on:
+      - api
+      - generator
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: argus-tunnel
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: ${TUNNEL_TOKEN:?create a tunnel and set its token — docs/deployment.md}
+    depends_on:
+      - dashboard
+      - api
+      - generator
+
+volumes:
+  kafka_data:
+  es_data:
+  pg_data:
