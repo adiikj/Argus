@@ -11,7 +11,13 @@ import {
   type StreamProducer,
 } from './streaming/index.js';
 import { parseRawLog } from './parser/index.js';
-import { createEsClient, ensureEventsIndex, indexEvent } from './storage/index.js';
+import {
+  createEsClient,
+  ensureEventsIndex,
+  indexEvent,
+  getEventById,
+  searchEvents,
+} from './storage/index.js';
 import { createRuleEngine, RULES, SeenEventIds } from './detection/index.js';
 import { createBus, type Bus } from './bus/index.js';
 import { createRealtimeServer } from './realtime/index.js';
@@ -20,6 +26,7 @@ import {
   createPrismaClient,
   attachAlert,
   getIncidentDetail,
+  getAlertsAndIncidentsForEvent,
   type PrismaClient,
 } from './incident/index.js';
 import { selectProvider, startAiEngine } from './ai/index.js';
@@ -101,12 +108,25 @@ async function startIncident(
 // realtime: internal bus -> WS (independent of storage/detection, §4/§9).
 // Listens to the bus, not Kafka directly — the incident engine is the one
 // Kafka consumer on `alerts`, per §7's wiring.
-async function startRealtime(bus: Bus, prisma: PrismaClient, m: Metrics): Promise<void> {
+async function startRealtime(
+  bus: Bus,
+  prisma: PrismaClient,
+  esClient: ReturnType<typeof createEsClient>,
+  m: Metrics,
+): Promise<void> {
   await createRealtimeServer(bus, config.PORT, {
     getMetrics: () => m.snapshot(),
     getIncidentDetail: (id) => getIncidentDetail(prisma, id),
+    searchEvents: (params) => searchEvents(esClient, params),
+    getEventTrace: async (eventId) => {
+      const [event, { alerts, incidents }] = await Promise.all([
+        getEventById(esClient, eventId),
+        getAlertsAndIncidentsForEvent(prisma, eventId),
+      ]);
+      return { eventId, event, alerts, incidents };
+    },
   });
-  log.info({ port: config.PORT }, 'realtime WS + /healthz + /metrics + /incidents/:id listening');
+  log.info({ port: config.PORT }, 'realtime WS + REST (incidents, events, trace) listening');
 }
 
 // ai: incident.created/updated -> LLMProvider (or template fallback) -> summaries, on the bus (§8)
@@ -132,5 +152,5 @@ await startParser(kafka, producer, metrics);
 await startStorage(kafka, esClient, metrics);
 await startDetection(kafka, producer, metrics);
 await startIncident(kafka, prisma, bus, metrics);
-await startRealtime(bus, prisma, metrics);
+await startRealtime(bus, prisma, esClient, metrics);
 startAi(prisma, bus, metrics);

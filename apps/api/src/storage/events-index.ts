@@ -1,5 +1,5 @@
 import type { Client } from '@elastic/elasticsearch';
-import type { NormalizedEvent } from '@argus/contracts';
+import { NormalizedEvent } from '@argus/contracts';
 
 export const EVENTS_INDEX = 'normalized-events';
 
@@ -33,4 +33,53 @@ export async function indexEvent(client: Client, event: NormalizedEvent): Promis
     id: event.eventId,
     document: event,
   });
+}
+
+export async function getEventById(
+  client: Client,
+  eventId: string,
+): Promise<NormalizedEvent | undefined> {
+  const result = await client.search({
+    index: EVENTS_INDEX,
+    query: { ids: { values: [eventId] } },
+    size: 1,
+  });
+  const hit = result.hits.hits[0];
+  return hit?._source ? NormalizedEvent.parse(hit._source) : undefined;
+}
+
+export interface EventSearchParams {
+  q?: string;
+  source?: string;
+  limit?: number;
+}
+
+export async function searchEvents(
+  client: Client,
+  params: EventSearchParams = {},
+): Promise<NormalizedEvent[]> {
+  const must = [];
+  if (params.q) {
+    must.push({
+      multi_match: {
+        query: params.q,
+        fields: ['raw', 'sourceIp', 'username', 'path', 'userAgent'],
+        lenient: true,
+      },
+    });
+  }
+  if (params.source) {
+    must.push({ term: { source: params.source } });
+  }
+
+  const result = await client.search({
+    index: EVENTS_INDEX,
+    size: params.limit ?? 50,
+    sort: [{ timestamp: { order: 'desc' } }],
+    query: must.length > 0 ? { bool: { must } } : { match_all: {} },
+  });
+
+  return result.hits.hits.flatMap((hit) =>
+    hit._source ? [NormalizedEvent.parse(hit._source)] : [],
+  );
 }

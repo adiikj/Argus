@@ -8,4 +8,5 @@ export {
   type IncidentWithAlerts,
   type IncidentDetail,
 } from './detail.js';
+export { getAlertsAndIncidentsForEvent, type EventAlertTrace } from './trace.js';
 export type { PrismaClient } from '../../generated/prisma/index.js';

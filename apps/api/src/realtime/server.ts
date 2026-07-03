@@ -1,12 +1,22 @@
 import Fastify from 'fastify';
 import websocketPlugin, { type WebSocket } from '@fastify/websocket';
-import type { IncidentSummary } from '@argus/contracts';
+import type { Alert, Incident, IncidentSummary, NormalizedEvent } from '@argus/contracts';
 import type { Bus, IncidentEvent } from '../bus/index.js';
 import type { IncidentDetail } from '../incident/index.js';
+import type { EventSearchParams } from '../storage/index.js';
+
+export interface EventTrace {
+  eventId: string;
+  event: NormalizedEvent | undefined;
+  alerts: Alert[];
+  incidents: Incident[];
+}
 
 export interface RealtimeOptions {
   getMetrics?: () => unknown;
   getIncidentDetail?: (id: string) => Promise<IncidentDetail | undefined>;
+  searchEvents?: (params: EventSearchParams) => Promise<NormalizedEvent[]>;
+  getEventTrace?: (eventId: string) => Promise<EventTrace>;
 }
 
 export async function createRealtimeServer(bus: Bus, port: number, opts: RealtimeOptions = {}) {
@@ -35,6 +45,19 @@ export async function createRealtimeServer(bus: Bus, port: number, opts: Realtim
       return { error: 'incident not found' };
     }
     return detail;
+  });
+
+  app.get('/events', async (req) => {
+    const { q, source, limit } = req.query as { q?: string; source?: string; limit?: string };
+    const events =
+      (await opts.searchEvents?.({ q, source, limit: limit ? Number(limit) : undefined })) ?? [];
+    return { events };
+  });
+
+  app.get('/events/:eventId/trace', async (req) => {
+    const { eventId } = req.params as { eventId: string };
+    const trace = await opts.getEventTrace?.(eventId);
+    return trace ?? { eventId, event: undefined, alerts: [], incidents: [] };
   });
 
   const send = (payload: unknown): void => {
