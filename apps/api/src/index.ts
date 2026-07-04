@@ -2,6 +2,7 @@ import { loadConfig } from '@argus/config';
 import { createLogger } from '@argus/logger';
 import { RawLog, NormalizedEvent, Alert } from '@argus/contracts';
 import type { Kafka } from 'kafkajs';
+import { createClient } from 'redis';
 import {
   createKafkaClient,
   ensureTopics,
@@ -18,8 +19,17 @@ import {
   getEventById,
   searchEvents,
 } from './storage/index.js';
-import { createRuleEngine, RULES, SeenEventIds } from './detection/index.js';
-import { createBus, HotEntities, type Bus } from './bus/index.js';
+import {
+  createRuleEngine,
+  RULES,
+  SeenEventIds,
+  InMemoryWindowStore,
+  RedisWindowStore,
+  InMemoryBaselineStore,
+  type WindowStore,
+  type BaselineStore,
+} from './detection/index.js';
+import { createBus, RedisBus, HotEntities, type Bus } from './bus/index.js';
 import { createRealtimeServer } from './realtime/index.js';
 import { createMetrics, type Metrics } from './metrics/index.js';
 import {
@@ -84,15 +94,17 @@ async function startDetection(
   producer: StreamProducer,
   bus: Bus,
   hotEntities: HotEntities,
+  windowStore: WindowStore,
+  baselineStore: BaselineStore,
   m: Metrics,
 ): Promise<void> {
   const seenEventIds = new SeenEventIds(5 * 60 * 1000);
-  const ruleEngine = createRuleEngine(RULES);
+  const ruleEngine = createRuleEngine(RULES, windowStore, baselineStore);
   await subscribe(kafka, 'api-detection', TOPICS.EVENTS_NORMALIZED, async (value) => {
     const event = NormalizedEvent.parse(value);
     if (seenEventIds.hasSeen(event.eventId)) return; // at-least-once redelivery guard, §4
 
-    for (const alert of ruleEngine.evaluate(event)) {
+    for (const alert of await ruleEngine.evaluate(event)) {
       await producer.send(TOPICS.ALERTS, alert.entity, alert);
       m.incr('alertsRaised');
       hotEntities.markHot(alert.entity);
@@ -167,12 +179,30 @@ await ensureEventsIndex(esClient);
 const prisma = createPrismaClient(config);
 
 const producer = await createProducer(kafka);
-const bus = createBus();
 const hotEntities = new HotEntities(CORRELATION_WINDOW_MS);
+const baselineStore: BaselineStore = new InMemoryBaselineStore();
+
+// no REDIS_URL -> everything stays in-process (single instance, no extra
+// infra); set it to back the window store + bus with Redis instead, so
+// detection state and event fanout survive across more than one api process.
+let bus: Bus;
+let windowStore: WindowStore;
+if (config.REDIS_URL) {
+  const redisClient = createClient({ url: config.REDIS_URL });
+  const redisSubscriber = redisClient.duplicate();
+  await Promise.all([redisClient.connect(), redisSubscriber.connect()]);
+  windowStore = new RedisWindowStore(redisClient);
+  bus = await RedisBus.create(redisClient, redisSubscriber);
+  log.info({ redisUrl: config.REDIS_URL }, 'using Redis-backed window store + bus');
+} else {
+  windowStore = new InMemoryWindowStore();
+  bus = createBus();
+  log.info('using in-memory window store + local bus (set REDIS_URL to distribute them)');
+}
 
 await startParser(kafka, producer, metrics);
 await startStorage(kafka, esClient, bus, hotEntities, metrics);
-await startDetection(kafka, producer, bus, hotEntities, metrics);
+await startDetection(kafka, producer, bus, hotEntities, windowStore, baselineStore, metrics);
 await startIncident(kafka, prisma, bus, metrics);
 const auth: AuthOptions | undefined = config.SITE_PASSWORD
   ? { sitePassword: config.SITE_PASSWORD, authSecret: config.AUTH_SECRET ?? config.SITE_PASSWORD }

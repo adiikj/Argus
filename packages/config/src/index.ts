@@ -40,6 +40,11 @@ const EnvSchema = z.object({
 
   // '*' for local dev; set to the real dashboard hostname once one exists (post-deploy)
   CORS_ORIGIN: z.string().default('*'),
+
+  // leave blank to keep the window store + bus in-process (single instance, no
+  // extra infra); set it to back both with Redis (sorted sets / pub-sub) so
+  // detection state and event fanout survive across more than one api process
+  REDIS_URL: z.string().optional(),
 });
 
 export type AppConfig = z.infer<typeof EnvSchema>;

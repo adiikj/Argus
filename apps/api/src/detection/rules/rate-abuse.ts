@@ -10,12 +10,12 @@ export const RULE_ID = 'api-rate-abuse';
 export const rateAbuseRule: StatefulRule = {
   kind: 'stateful',
   id: RULE_ID,
-  evaluate: (event, ctx) => {
+  evaluate: async (event, ctx) => {
     if (event.source !== 'api-gateway') return undefined;
 
     // record every gateway request under the source IP; the window returns all
     // entries still inside WINDOW_MS (see WindowStore).
-    const recent = ctx.window.record(event.sourceIp, event.eventId, WINDOW_MS);
+    const recent = await ctx.window.record(event.sourceIp, event.eventId, WINDOW_MS);
 
     if (recent.length > THRESHOLD) {
       return {

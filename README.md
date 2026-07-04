@@ -61,7 +61,8 @@ graph LR
 
 Node 24 · TypeScript (strict) · Fastify · Kafka (KRaft) · Elasticsearch · PostgreSQL (Prisma) ·
 Next.js 16 · WebSockets · shadcn/ui · TanStack Query · Recharts · Framer Motion · Docker Compose ·
-pnpm + Turborepo.
+pnpm + Turborepo. Redis is optional (`REDIS_URL`) — backs the detection window store + internal bus
+for multi-instance runs; unset, both stay in-process.
 
 ## Repository layout
 
@@ -129,3 +130,12 @@ LLM-generated summaries, set in `.env`:
 ```bash
 LLM_PROVIDER=groq            # or "gemini"
 GROQ_API_KEY=...             # or GEMINI_API_KEY
+```
+
+### Optional: site password + rate limiting
+
+The dashboard and api run fully open by default. Set `SITE_PASSWORD` in `.env` to require a login
+(`/login`) before every route except the api's `/healthz`; leave it blank to keep everything
+unauthenticated, same "runs with zero keys" shape as the AI layer. The generator's
+`/simulate/:scenario` and every api REST endpoint are token-bucket rate limited regardless, so a
+public demo URL can't be scripted into hammering the LLM's free-tier quota.

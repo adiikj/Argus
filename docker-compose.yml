@@ -83,6 +83,20 @@ services:
       retries: 12
       start_period: 10s
 
+  # optional — only used if REDIS_URL is set (see .env.example). The window
+  # store + internal bus both fall back to in-process state without it.
+  redis:
+    image: redis:7-alpine
+    container_name: argus-redis
+    ports:
+      - '127.0.0.1:${REDIS_HOST_PORT:-6379}:6379'
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 5s
+
 volumes:
   kafka_data:
   es_data:

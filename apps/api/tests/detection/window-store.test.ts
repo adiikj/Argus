@@ -1,25 +1,25 @@
 import { describe, it, expect } from 'vitest';
-import { WindowStore, SeenEventIds } from '../../src/detection/window-store.js';
+import { InMemoryWindowStore, SeenEventIds } from '../../src/detection/window-store.js';
 
-describe('WindowStore', () => {
-  it('accumulates entries within the window', () => {
-    const store = new WindowStore();
-    store.record('ip', 'e1', 1000, 0);
-    const entries = store.record('ip', 'e2', 1000, 500);
+describe('InMemoryWindowStore', () => {
+  it('accumulates entries within the window', async () => {
+    const store = new InMemoryWindowStore();
+    await store.record('ip', 'e1', 1000, 0);
+    const entries = await store.record('ip', 'e2', 1000, 500);
     expect(entries.map((e) => e.eventId)).toEqual(['e1', 'e2']);
   });
 
-  it('evicts entries older than the window', () => {
-    const store = new WindowStore();
-    store.record('ip', 'old', 1000, 0);
-    const entries = store.record('ip', 'new', 1000, 2000); // 'old' is now >1000ms back
+  it('evicts entries older than the window', async () => {
+    const store = new InMemoryWindowStore();
+    await store.record('ip', 'old', 1000, 0);
+    const entries = await store.record('ip', 'new', 1000, 2000); // 'old' is now >1000ms back
     expect(entries.map((e) => e.eventId)).toEqual(['new']);
   });
 
-  it('keeps windows independent per key', () => {
-    const store = new WindowStore();
-    store.record('a', 'a1', 1000, 0);
-    const entries = store.record('b', 'b1', 1000, 0);
+  it('keeps windows independent per key', async () => {
+    const store = new InMemoryWindowStore();
+    await store.record('a', 'a1', 1000, 0);
+    const entries = await store.record('b', 'b1', 1000, 0);
     expect(entries).toHaveLength(1);
   });
 });

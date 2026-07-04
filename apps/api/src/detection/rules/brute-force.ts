@@ -9,10 +9,10 @@ export const RULE_ID = 'brute-force-ssh';
 export const bruteForceRule: StatefulRule = {
   kind: 'stateful',
   id: RULE_ID,
-  evaluate: (event, ctx) => {
+  evaluate: async (event, ctx) => {
     if (event.source !== 'auth' || event.outcome !== 'failure') return undefined;
 
-    const entries = ctx.window.record(event.sourceIp, event.eventId, WINDOW_MS);
+    const entries = await ctx.window.record(event.sourceIp, event.eventId, WINDOW_MS);
     if (entries.length < THRESHOLD) return undefined;
 
     return {
