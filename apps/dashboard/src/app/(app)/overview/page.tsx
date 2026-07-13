@@ -226,6 +226,7 @@ export default function OverviewPage() {
                       fill="url(#alertsGradient)"
                       strokeWidth={2}
                       name="alerts / interval"
+                      isAnimationActive={false}
                     />
                   </AreaChart>
                 </ResponsiveContainer>
@@ -263,7 +264,7 @@ export default function OverviewPage() {
                       cursor={{ fill: 'var(--color-bg-elevated)' }}
                       contentStyle={TOOLTIP_STYLE}
                     />
-                    <Bar dataKey="count" radius={[0, 4, 4, 0]}>
+                    <Bar dataKey="count" radius={[0, 4, 4, 0]} isAnimationActive={false}>
                       {severityData.map((entry) => (
                         <Cell key={entry.severity} fill={SEVERITY_VAR[entry.severity]} />
                       ))}
@@ -344,7 +345,7 @@ export default function OverviewPage() {
                       cursor={{ fill: 'var(--color-bg-elevated)' }}
                       contentStyle={TOOLTIP_STYLE}
                     />
-                    <Bar dataKey="count" radius={[0, 4, 4, 0]}>
+                    <Bar dataKey="count" radius={[0, 4, 4, 0]} isAnimationActive={false}>
                       {ruleData.map((entry, i) => (
                         <Cell key={entry.ruleId} fill={RULE_COLORS[i % RULE_COLORS.length]} />
                       ))}

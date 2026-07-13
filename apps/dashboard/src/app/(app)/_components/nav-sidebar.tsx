@@ -1,20 +1,27 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import { Search, Compass } from 'lucide-react';
+import { usePathname, useRouter } from 'next/navigation';
+import { Search, Compass, Tv, Info, LogOut } from 'lucide-react';
 import { Wordmark } from '../../_components/wordmark';
 import { useRealtime } from '@/lib/realtime';
 import { useTour } from '@/lib/tour';
+import { clearToken } from '@/lib/auth';
 import { NAV_ITEMS } from '@/lib/nav-items';
 import { useCommandPalette } from './command-palette';
 import { cn } from '@/lib/utils';
 
 export function NavSidebar() {
   const pathname = usePathname();
+  const router = useRouter();
   const { connected } = useRealtime();
   const { setOpen } = useCommandPalette();
   const { start: startTour } = useTour();
+
+  const logout = (): void => {
+    clearToken();
+    router.replace('/login');
+  };
 
   return (
     <aside className="sticky top-0 flex h-screen w-56 shrink-0 flex-col border-r border-border-subtle bg-bg-panel">
@@ -68,8 +75,8 @@ export function NavSidebar() {
         })}
       </nav>
 
-      <div className="flex flex-col gap-1.5 border-t border-border-subtle px-4 py-3 font-mono text-xs text-text-secondary">
-        <div className="flex items-center gap-2">
+      <div className="flex flex-col gap-3 border-t border-border-subtle p-3">
+        <div className="flex items-center gap-2 px-3 font-mono text-xs text-text-secondary">
           <span
             className={cn(
               'h-2 w-2 rounded-full',
@@ -78,9 +85,30 @@ export function NavSidebar() {
           />
           {connected ? 'connected' : 'disconnected'}
         </div>
-        <Link href="/about" className="transition-colors hover:text-text-primary">
-          About this project
-        </Link>
+        <div className="flex flex-col gap-1">
+          <Link
+            href="/wall"
+            className="flex items-center gap-2.5 rounded-md px-3 py-2 font-mono text-xs text-text-secondary transition-colors hover:bg-bg-elevated hover:text-text-primary"
+          >
+            <Tv className="h-4 w-4" strokeWidth={1.8} />
+            SOC wall
+          </Link>
+          <Link
+            href="/about"
+            className="flex items-center gap-2.5 rounded-md px-3 py-2 font-mono text-xs text-text-secondary transition-colors hover:bg-bg-elevated hover:text-text-primary"
+          >
+            <Info className="h-4 w-4" strokeWidth={1.8} />
+            About this project
+          </Link>
+          <button
+            type="button"
+            onClick={logout}
+            className="flex items-center gap-2.5 rounded-md px-3 py-2 font-mono text-xs text-text-secondary transition-colors hover:bg-severity-critical/10 hover:text-severity-critical"
+          >
+            <LogOut className="h-4 w-4" strokeWidth={1.8} />
+            Log out
+          </button>
+        </div>
       </div>
     </aside>
   );

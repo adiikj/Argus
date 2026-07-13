@@ -325,9 +325,19 @@ export default function Landing() {
           <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-3 px-6 py-8 font-mono text-xs text-text-secondary sm:flex-row">
             <Wordmark />
             <span>The hundred-eyed watchman for your logs.</span>
-            <Link href="/about" className="transition-colors hover:text-text-primary">
-              About this project
-            </Link>
+            <div className="flex items-center gap-4">
+              <Link href="/about" className="transition-colors hover:text-text-primary">
+                About this project
+              </Link>
+              <a
+                href="https://adiikj.dev"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="transition-colors hover:text-accent"
+              >
+                Built by adiikj.dev
+              </a>
+            </div>
           </div>
         </footer>
       </main>
