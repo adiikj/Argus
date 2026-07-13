@@ -6,10 +6,10 @@ import { createGroqProvider } from './providers/groq.js';
 
 export function selectProvider(config: AppConfig): LLMProvider {
   if (config.LLM_PROVIDER === 'gemini' && config.GEMINI_API_KEY) {
-    return createGeminiProvider(config.GEMINI_API_KEY);
+    return createGeminiProvider(config.GEMINI_API_KEY, config.GEMINI_MODEL);
   }
   if (config.LLM_PROVIDER === 'groq' && config.GROQ_API_KEY) {
-    return createGroqProvider(config.GROQ_API_KEY);
+    return createGroqProvider(config.GROQ_API_KEY, config.GROQ_MODEL);
   }
   return templateProvider;
 }

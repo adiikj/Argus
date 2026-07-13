@@ -77,7 +77,7 @@ const STATS = [
 function CtaButton({ children }: { children: ReactNode }) {
   return (
     <Link
-      href="/alerts"
+      href="/login"
       className="group inline-flex items-center gap-2 rounded-lg bg-accent px-6 py-3 font-mono text-sm font-semibold text-bg-base transition-transform hover:-translate-y-0.5"
     >
       {children}
@@ -102,7 +102,7 @@ export default function Landing() {
             >
               Features
             </a>
-            <Link href="/alerts" className="transition-colors hover:text-accent">
+            <Link href="/login" className="transition-colors hover:text-accent">
               live console →
             </Link>
           </nav>

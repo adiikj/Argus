@@ -110,6 +110,8 @@ services:
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
       CORS_ORIGIN: ${CORS_ORIGIN:-*}
       REDIS_URL: ${REDIS_URL:-}
+      SLACK_WEBHOOK_URL: ${SLACK_WEBHOOK_URL:-}
+      DASHBOARD_URL: ${DASHBOARD_URL:-}
     depends_on:
       kafka: { condition: service_healthy }
       elasticsearch: { condition: service_healthy }

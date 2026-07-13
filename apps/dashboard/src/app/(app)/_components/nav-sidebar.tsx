@@ -15,7 +15,7 @@ export function NavSidebar() {
   const { setOpen } = useCommandPalette();
 
   return (
-    <aside className="flex h-screen w-56 shrink-0 flex-col border-r border-border-subtle bg-bg-panel">
+    <aside className="sticky top-0 flex h-screen w-56 shrink-0 flex-col border-r border-border-subtle bg-bg-panel">
       <div className="border-b border-border-subtle px-4 py-4">
         <Wordmark />
       </div>

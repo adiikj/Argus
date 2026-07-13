@@ -4,9 +4,11 @@ import {
   IncidentPatch,
   type Alert,
   type Incident,
+  type IncidentQueryResult,
   type IncidentSummary,
   type NormalizedEvent,
   type PublicUser,
+  type RecentActivity,
 } from '@argus/contracts';
 import type { Bus, IncidentEvent } from '../bus/index.js';
 import type { IncidentDetail, PatchIncidentResult } from '../incident/index.js';
@@ -37,6 +39,8 @@ export interface RealtimeOptions {
   getMetrics?: () => unknown;
   getIncidentDetail?: (id: string) => Promise<IncidentDetail | undefined>;
   patchIncident?: (id: string, input: IncidentPatch) => Promise<PatchIncidentResult>;
+  queryIncidents?: (question: string) => Promise<IncidentQueryResult>;
+  getRecentActivity?: () => Promise<RecentActivity>;
   listUsers?: () => Promise<PublicUser[]>;
   searchEvents?: (params: EventSearchParams) => Promise<NormalizedEvent[]>;
   getEventTrace?: (eventId: string) => Promise<EventTrace>;
@@ -50,8 +54,18 @@ export async function createRealtimeServer(bus: Bus, port: number, opts: Realtim
   await app.register(websocketPlugin);
 
   const corsOrigin = opts.corsOrigin ?? '*';
-  app.addHook('onRequest', async (_req, reply) => {
+  app.addHook('onRequest', async (req, reply) => {
     reply.header('access-control-allow-origin', corsOrigin);
+    // browsers preflight any POST with a JSON body (auth/login etc. all
+    // qualify) — Fastify has no route for OPTIONS, so without this it 404s
+    // and the preflight (and therefore the real request) is rejected.
+    if (req.method === 'OPTIONS') {
+      reply
+        .header('access-control-allow-methods', 'GET, POST, PATCH, DELETE, OPTIONS')
+        .header('access-control-allow-headers', 'content-type, authorization')
+        .code(204)
+        .send();
+    }
   });
 
   app.addHook('onRequest', async (req, reply) => {
@@ -129,6 +143,15 @@ export async function createRealtimeServer(bus: Bus, port: number, opts: Realtim
 
   app.get('/metrics', async () => opts.getMetrics?.() ?? {});
 
+  app.get('/incidents', async () => {
+    const empty: RecentActivity = {
+      incidents: [],
+      ruleCounts: {},
+      hourlyActivity: Array(24).fill(0),
+    };
+    return (await opts.getRecentActivity?.()) ?? empty;
+  });
+
   app.get('/incidents/:id', async (req, reply) => {
     const { id } = req.params as { id: string };
     const detail = await opts.getIncidentDetail?.(id);
@@ -159,6 +182,15 @@ export async function createRealtimeServer(bus: Bus, port: number, opts: Realtim
 
     bus.emit('incident.status_changed', { incident: result.incident });
     return result.incident;
+  });
+
+  app.post('/incidents/query', async (req, reply) => {
+    const { question } = (req.body ?? {}) as { question?: string };
+    if (!question?.trim()) {
+      reply.code(400);
+      return { error: 'question required' };
+    }
+    return (await opts.queryIncidents?.(question)) ?? { filter: {}, incidents: [] };
   });
 
   app.get('/users', async () => ({ users: (await opts.listUsers?.()) ?? [] }));

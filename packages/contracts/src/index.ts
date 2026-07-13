@@ -91,6 +91,40 @@ export const PublicUser = z.object({
 });
 export type PublicUser = z.infer<typeof PublicUser>;
 
+// POST /incidents/query body -> a structured filter, translated from a plain-
+// English question (LLM, or a keyword/regex fallback — apps/api/src/ai).
+// ruleId stays a loose string rather than an enum: an unrecognized value from
+// either path just yields zero matches, simpler than keeping an enum in sync
+// across three provider implementations.
+export const IncidentQuery = z.object({
+  ruleId: z.string().optional(),
+  severity: Severity.optional(),
+  status: IncidentStatus.optional(),
+  sinceMinutes: z.number().int().positive().optional(),
+});
+export type IncidentQuery = z.infer<typeof IncidentQuery>;
+
+export const IncidentQueryResult = z.object({
+  filter: IncidentQuery,
+  incidents: z.array(Incident),
+});
+export type IncidentQueryResult = z.infer<typeof IncidentQueryResult>;
+
+// GET /incidents — recent-incidents backfill so a freshly opened dashboard
+// tab isn't empty until new events happen to arrive live over the socket.
+export const IncidentRow = z.object({
+  incident: Incident,
+  latestAlert: Alert,
+});
+export type IncidentRow = z.infer<typeof IncidentRow>;
+
+export const RecentActivity = z.object({
+  incidents: z.array(IncidentRow),
+  ruleCounts: z.record(z.string(), z.number().int().nonnegative()),
+  hourlyActivity: z.array(z.number().int().nonnegative()).length(24),
+});
+export type RecentActivity = z.infer<typeof RecentActivity>;
+
 export const Summarizer = z.enum(['llm', 'template']);
 export type Summarizer = z.infer<typeof Summarizer>;
 

@@ -4,6 +4,8 @@ export { correlate, CORRELATION_WINDOW_MS, type CorrelationResult } from './corr
 export { incidentRowToContract, alertRowToContract } from './mappers.js';
 export { canTransition } from './transitions.js';
 export { patchIncident, type PatchIncidentResult, type PatchIncidentError } from './update.js';
+export { searchIncidents } from './query.js';
+export { getRecentActivity } from './recent.js';
 export {
   loadIncidentWithAlerts,
   getIncidentDetail,

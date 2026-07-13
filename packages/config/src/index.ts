@@ -27,6 +27,9 @@ const EnvSchema = z.object({
   LLM_PROVIDER: z.enum(['none', 'gemini', 'groq']).default('none'),
   GEMINI_API_KEY: z.string().optional(),
   GROQ_API_KEY: z.string().optional(),
+  // leave blank to use each provider's built-in default model
+  GEMINI_MODEL: z.string().optional(),
+  GROQ_MODEL: z.string().optional(),
 
   DEMO_MODE: z
     .enum(['true', 'false'])
@@ -50,6 +53,12 @@ const EnvSchema = z.object({
   // extra infra); set it to back both with Redis (sorted sets / pub-sub) so
   // detection state and event fanout survive across more than one api process
   REDIS_URL: z.string().optional(),
+
+  // optional: posts a Slack-compatible message on high/critical incidents,
+  // same "runs with zero keys" degradation as the LLM/auth integrations
+  SLACK_WEBHOOK_URL: z.string().optional(),
+  // included as a clickable link in notifications if set; omitted otherwise
+  DASHBOARD_URL: z.string().optional(),
 });
 
 export type AppConfig = z.infer<typeof EnvSchema>;

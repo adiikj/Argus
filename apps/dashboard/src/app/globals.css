@@ -30,6 +30,35 @@ body {
   color: var(--color-text-primary);
 }
 
+button:not(:disabled) {
+  cursor: pointer;
+}
+
+/* dark-themed scrollbars — the browser default (light gray) breaks the
+   console look wherever a panel scrolls (pipeline diagram, activity feed). */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border-subtle) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background-color: var(--color-border-subtle);
+  border-radius: 9999px;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background-color: var(--color-text-secondary);
+}
+
 @keyframes alert-in {
   from {
     opacity: 0;

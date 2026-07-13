@@ -37,11 +37,14 @@ import {
   attachAlert,
   getIncidentDetail,
   patchIncident,
+  searchIncidents,
+  getRecentActivity,
   getAlertsAndIncidentsForEvent,
   CORRELATION_WINDOW_MS,
   type PrismaClient,
 } from './incident/index.js';
-import { selectProvider, startAiEngine } from './ai/index.js';
+import { selectProvider, startAiEngine, translateQuery } from './ai/index.js';
+import { startWebhookNotifier } from './notifications/index.js';
 import { getSystemHealth } from './system/index.js';
 import { createAuthService, listUsers, type AuthService } from './auth/index.js';
 
@@ -150,6 +153,11 @@ async function startRealtime(
     getMetrics: () => m.snapshot(),
     getIncidentDetail: (id) => getIncidentDetail(prisma, id),
     patchIncident: (id, input) => patchIncident(prisma, id, input),
+    getRecentActivity: () => getRecentActivity(prisma),
+    queryIncidents: async (question) => {
+      const filter = await translateQuery(selectProvider(config), question, log);
+      return { filter, incidents: await searchIncidents(prisma, filter) };
+    },
     listUsers: () => listUsers(prisma),
     searchEvents: (params) => eventStore.search(params),
     getEventTrace: async (eventId) => {
@@ -172,6 +180,22 @@ function startAi(prisma: PrismaClient, bus: Bus, m: Metrics): void {
   startAiEngine({ prisma, bus, provider, log });
   bus.on('summary.ready', () => m.incr('summariesGenerated'));
   log.info({ provider: provider.name }, 'ai summarization engine started');
+}
+
+// notifications: incident.created/updated -> Slack-compatible webhook on
+// high/critical severity, at most once per incident. No-op unless
+// SLACK_WEBHOOK_URL is set — same "runs with zero keys" degradation as AI/auth.
+function startNotifications(bus: Bus): void {
+  if (!config.SLACK_WEBHOOK_URL) {
+    log.info('no SLACK_WEBHOOK_URL set — webhook notifications disabled');
+    return;
+  }
+  startWebhookNotifier(
+    bus,
+    { webhookUrl: config.SLACK_WEBHOOK_URL, dashboardUrl: config.DASHBOARD_URL },
+    log,
+  );
+  log.info('webhook notifier started');
 }
 
 const kafka = createKafkaClient(config);
@@ -224,3 +248,4 @@ const authService = await createAuthService(prisma, {
 
 await startRealtime(kafka, bus, prisma, eventStore, metrics, authService);
 startAi(prisma, bus, metrics);
+startNotifications(bus);
