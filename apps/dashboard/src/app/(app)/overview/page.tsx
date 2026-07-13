@@ -174,7 +174,11 @@ export default function OverviewPage() {
         )}
       </div>
 
-      <motion.div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4" {...fadeIn(0)}>
+      <motion.div
+        data-tour="overview-metrics"
+        className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4"
+        {...fadeIn(0)}
+      >
         <MetricCard label="events" value={metricValue(metrics?.eventsNormalized)} />
         <MetricCard label="alerts" value={metricValue(metrics?.alertsRaised)} />
         <MetricCard label="incidents" value={metricValue(metrics?.incidentsOpened)} accent />
@@ -275,7 +279,7 @@ export default function OverviewPage() {
       </div>
 
       <div className="mt-4 grid gap-4 lg:grid-cols-3">
-        <motion.div className="lg:col-span-2" {...fadeIn(0.24)}>
+        <motion.div data-tour="top-attackers" className="lg:col-span-2" {...fadeIn(0.24)}>
           <Card>
             <CardHeader>
               <CardTitle>Top attackers</CardTitle>

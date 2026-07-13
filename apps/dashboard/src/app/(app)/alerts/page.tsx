@@ -144,7 +144,7 @@ export default function AlertsPage() {
           )}
         </>
       ) : (
-        <>
+        <div data-tour="alerts-feed">
           <div className="mb-4 flex flex-wrap items-center gap-2">
             <FilterChip
               label="all"
@@ -224,7 +224,7 @@ export default function AlertsPage() {
               </AnimatePresence>
             </ul>
           )}
-        </>
+        </div>
       )}
     </main>
   );

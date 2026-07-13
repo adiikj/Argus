@@ -102,6 +102,12 @@ export default function Landing() {
             >
               Features
             </a>
+            <Link
+              href="/about"
+              className="hidden transition-colors hover:text-text-primary sm:inline"
+            >
+              About
+            </Link>
             <Link href="/login" className="transition-colors hover:text-accent">
               live console →
             </Link>
@@ -319,6 +325,9 @@ export default function Landing() {
           <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-3 px-6 py-8 font-mono text-xs text-text-secondary sm:flex-row">
             <Wordmark />
             <span>The hundred-eyed watchman for your logs.</span>
+            <Link href="/about" className="transition-colors hover:text-text-primary">
+              About this project
+            </Link>
           </div>
         </footer>
       </main>

@@ -5,11 +5,30 @@ import { GeistMono } from 'geist/font/mono';
 import { Providers } from './providers';
 import './globals.css';
 
+const TITLE = 'Argus — AI-powered security event analysis';
+const DESCRIPTION =
+  'Argus ingests a live stream of security events, detects threats, correlates them into incidents, and explains each one in plain language — on a real-time console.';
+
 export const metadata: Metadata = {
-  title: 'Argus — AI-powered security event analysis',
-  description:
-    'Argus ingests a live stream of security events, detects threats, correlates them into incidents, and explains each one in plain language — on a real-time console.',
+  // resolves relative OG/twitter image paths to absolute URLs — set
+  // NEXT_PUBLIC_SITE_URL to the real domain once deployed; degrades to
+  // localhost in dev, same "optional, zero required config" pattern as
+  // GOOGLE_CLIENT_ID/SLACK_WEBHOOK_URL elsewhere in this project.
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000'),
+  title: TITLE,
+  description: DESCRIPTION,
   icons: { icon: '/favicon.png' },
+  openGraph: {
+    title: TITLE,
+    description: DESCRIPTION,
+    siteName: 'Argus',
+    type: 'website',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: TITLE,
+    description: DESCRIPTION,
+  },
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {

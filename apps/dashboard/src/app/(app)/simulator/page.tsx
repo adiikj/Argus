@@ -36,7 +36,7 @@ export default function SimulatorPage() {
       </p>
 
       <div className="mb-6 grid gap-4 lg:grid-cols-3">
-        <div className="lg:col-span-2">
+        <div data-tour="pipeline-flow" className="lg:col-span-2">
           <PipelineFlow />
         </div>
         <SystemActivity />
@@ -51,7 +51,7 @@ export default function SimulatorPage() {
       )}
 
       {scenarios && (
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div data-tour="scenario-cards" className="grid gap-4 sm:grid-cols-2">
           {scenarios.map((scenario) => (
             <ScenarioCard key={scenario.name} scenario={scenario} />
           ))}
