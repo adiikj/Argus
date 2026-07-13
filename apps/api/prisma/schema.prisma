@@ -25,7 +25,9 @@ enum Severity {
 
 enum IncidentStatus {
   open
-  closed
+  acknowledged
+  resolved
+  false_positive
 }
 
 enum Summarizer {
@@ -47,9 +49,12 @@ model Incident {
   updatedAt      DateTime       @map("updated_at")
   alertIds       String[]       @map("alert_ids")
   eventIds       String[]       @map("event_ids")
+  assigneeId     String?        @map("assignee_id")
+  resolutionNote String?        @map("resolution_note")
 
-  alerts  Alert[]
-  summary Summary?
+  assignee User?    @relation(fields: [assigneeId], references: [userId])
+  alerts   Alert[]
+  summary  Summary?
 
   @@index([correlationKey, status, updatedAt])
   @@map("incidents")
@@ -120,6 +125,8 @@ model User {
   googleId     String?  @unique @map("google_id")
   name         String?
   createdAt    DateTime @default(now()) @map("created_at")
+
+  assignedIncidents Incident[]
 
   @@map("users")
 }

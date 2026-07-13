@@ -33,6 +33,11 @@ export async function registerUser(
   return { userId: user.userId, email: user.email, name: user.name };
 }
 
+export async function listUsers(prisma: PrismaClient): Promise<AuthUser[]> {
+  const users = await prisma.user.findMany({ orderBy: { email: 'asc' } });
+  return users.map((u) => ({ userId: u.userId, email: u.email, name: u.name }));
+}
+
 export async function loginWithPassword(
   prisma: PrismaClient,
   email: string,

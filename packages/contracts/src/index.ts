@@ -57,7 +57,7 @@ export const Alert = z.object({
 });
 export type Alert = z.infer<typeof Alert>;
 
-export const IncidentStatus = z.enum(['open', 'closed']);
+export const IncidentStatus = z.enum(['open', 'acknowledged', 'resolved', 'false_positive']);
 export type IncidentStatus = z.infer<typeof IncidentStatus>;
 
 // a correlated group of alerts
@@ -70,8 +70,26 @@ export const Incident = z.object({
   updatedAt: z.string().datetime(),
   alertIds: z.array(z.string().uuid()).min(1),
   eventIds: z.array(z.string().uuid()).min(1),
+  assigneeId: z.string().uuid().nullable(),
+  resolutionNote: z.string().nullable(),
 });
 export type Incident = z.infer<typeof Incident>;
+
+// PATCH /incidents/:id body
+export const IncidentPatch = z.object({
+  status: IncidentStatus.optional(),
+  assigneeId: z.string().uuid().nullable().optional(),
+  resolutionNote: z.string().optional(),
+});
+export type IncidentPatch = z.infer<typeof IncidentPatch>;
+
+// GET /users — just enough to populate an assignee picker
+export const PublicUser = z.object({
+  userId: z.string().uuid(),
+  email: z.string().email(),
+  name: z.string().nullable(),
+});
+export type PublicUser = z.infer<typeof PublicUser>;
 
 export const Summarizer = z.enum(['llm', 'template']);
 export type Summarizer = z.infer<typeof Summarizer>;

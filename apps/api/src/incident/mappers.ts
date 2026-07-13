@@ -15,6 +15,8 @@ export function incidentRowToContract(row: IncidentRow): Incident {
     updatedAt: row.updatedAt.toISOString(),
     alertIds: row.alertIds,
     eventIds: row.eventIds,
+    assigneeId: row.assigneeId,
+    resolutionNote: row.resolutionNote,
   };
 }
 

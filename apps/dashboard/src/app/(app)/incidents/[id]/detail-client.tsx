@@ -1,12 +1,18 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { ArrowLeft } from 'lucide-react';
+import type { Incident, IncidentStatus } from '@argus/contracts';
 import { useIncidentDetail } from '@/lib/use-incident-detail';
-import { Badge } from '@/components/ui/badge';
+import { usePatchIncident } from '@/lib/use-incident-mutation';
+import { useUsers } from '@/lib/use-users';
+import { Badge, type BadgeProps } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
+import { Button } from '@/components/ui/button';
+import { Textarea } from '@/components/ui/textarea';
 
 function formatDateTime(iso: string): string {
   return new Date(iso).toLocaleString(undefined, { hour12: false });
@@ -18,6 +24,137 @@ function fadeIn(delay: number) {
     animate: { opacity: 1, y: 0 },
     transition: { duration: 0.3, delay, ease: [0.16, 1, 0.3, 1] as const },
   };
+}
+
+const STATUS_VARIANT: Record<IncidentStatus, BadgeProps['variant']> = {
+  open: 'outline',
+  acknowledged: 'medium',
+  resolved: 'low',
+  false_positive: 'default',
+};
+
+const STATUS_LABEL: Record<IncidentStatus, string> = {
+  open: 'Reopen',
+  acknowledged: 'Acknowledge',
+  resolved: 'Resolve',
+  false_positive: 'Mark false positive',
+};
+
+// client-side copy of apps/api/src/incident/transitions.ts, for UI purposes
+// only — the server independently re-validates every transition.
+const TRANSITIONS: Record<IncidentStatus, IncidentStatus[]> = {
+  open: ['acknowledged', 'resolved', 'false_positive'],
+  acknowledged: ['resolved', 'false_positive', 'open'],
+  resolved: ['open'],
+  false_positive: ['open'],
+};
+
+function needsNote(status: IncidentStatus): boolean {
+  return status === 'resolved' || status === 'false_positive';
+}
+
+function IncidentActions({ incident }: { incident: Incident }) {
+  const { mutate, isPending } = usePatchIncident(incident.incidentId);
+  const { data: users } = useUsers();
+  const [pendingNoteStatus, setPendingNoteStatus] = useState<IncidentStatus | null>(null);
+  const [note, setNote] = useState('');
+
+  const fireTransition = (status: IncidentStatus): void => {
+    if (needsNote(status) && !incident.resolutionNote) {
+      setPendingNoteStatus(status);
+      return;
+    }
+    mutate({ status });
+  };
+
+  const confirmWithNote = (): void => {
+    if (!pendingNoteStatus || !note.trim()) return;
+    mutate({ status: pendingNoteStatus, resolutionNote: note.trim() });
+    setPendingNoteStatus(null);
+    setNote('');
+  };
+
+  return (
+    <Card className="mb-6">
+      <CardHeader>
+        <CardTitle>Actions</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="flex flex-wrap items-center gap-2">
+          {TRANSITIONS[incident.status].map((status) => (
+            <Button
+              key={status}
+              size="sm"
+              variant={status === 'open' ? 'outline' : 'secondary'}
+              disabled={isPending}
+              onClick={() => fireTransition(status)}
+            >
+              {STATUS_LABEL[status]}
+            </Button>
+          ))}
+        </div>
+
+        {pendingNoteStatus && (
+          <div className="space-y-2 rounded-md border border-border-subtle p-3">
+            <p className="text-xs text-text-secondary">
+              {STATUS_LABEL[pendingNoteStatus]} requires a resolution note.
+            </p>
+            <Textarea
+              autoFocus
+              rows={3}
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder="what happened, and how it was handled…"
+            />
+            <div className="flex gap-2">
+              <Button size="sm" disabled={!note.trim() || isPending} onClick={confirmWithNote}>
+                Confirm
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => {
+                  setPendingNoteStatus(null);
+                  setNote('');
+                }}
+              >
+                Cancel
+              </Button>
+            </div>
+          </div>
+        )}
+
+        <div className="flex items-center gap-2">
+          <label htmlFor="assignee" className="text-xs text-text-secondary">
+            Assignee
+          </label>
+          <select
+            id="assignee"
+            value={incident.assigneeId ?? ''}
+            disabled={isPending}
+            onChange={(e) => mutate({ assigneeId: e.target.value || null })}
+            className="rounded-md border border-border-subtle bg-bg-panel px-2 py-1 text-sm text-text-primary focus:border-accent/50 focus:outline-none"
+          >
+            <option value="">Unassigned</option>
+            {users?.map((u) => (
+              <option key={u.userId} value={u.userId}>
+                {u.name ?? u.email}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {incident.resolutionNote && (
+          <div>
+            <p className="mb-1 font-mono text-[10px] uppercase tracking-wider text-text-secondary">
+              Resolution note
+            </p>
+            <p className="text-sm text-text-secondary">{incident.resolutionNote}</p>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
 }
 
 export function IncidentDetailClient({ id }: { id: string }) {
@@ -56,7 +193,7 @@ export function IncidentDetailClient({ id }: { id: string }) {
       <motion.div className="mb-6" {...fadeIn(0)}>
         <div className="mb-2 flex items-center gap-2">
           <Badge variant={incident.severity}>{incident.severity}</Badge>
-          <Badge variant="outline">{incident.status}</Badge>
+          <Badge variant={STATUS_VARIANT[incident.status]}>{incident.status}</Badge>
         </div>
         <h1 className="font-mono text-lg font-semibold text-text-primary">
           {incident.correlationKey}
@@ -67,6 +204,10 @@ export function IncidentDetailClient({ id }: { id: string }) {
       </motion.div>
 
       <motion.div {...fadeIn(0.08)}>
+        <IncidentActions incident={incident} />
+      </motion.div>
+
+      <motion.div {...fadeIn(0.16)}>
         <Card className="mb-6">
           <CardHeader>
             <CardTitle>AI summary</CardTitle>
@@ -117,7 +258,7 @@ export function IncidentDetailClient({ id }: { id: string }) {
         </Card>
       </motion.div>
 
-      <motion.div {...fadeIn(0.16)}>
+      <motion.div {...fadeIn(0.24)}>
         <Card>
           <CardHeader>
             <CardTitle>

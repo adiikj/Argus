@@ -8,9 +8,18 @@ export interface IncidentEvent {
   latestAlert: Alert;
 }
 
+// a manual lifecycle change (PATCH /incidents/:id) has no associated alert,
+// so it's a distinct event rather than an optional latestAlert on
+// IncidentEvent — the dashboard's live incident feed and Alerts page both
+// read `latestAlert.ruleId`/`.message` unconditionally off incident.updated.
+export interface IncidentStatusChangedEvent {
+  incident: Incident;
+}
+
 interface BusEvents {
   'incident.created': [IncidentEvent];
   'incident.updated': [IncidentEvent];
+  'incident.status_changed': [IncidentStatusChangedEvent];
   'summary.ready': [IncidentSummary];
   'event.normalized': [NormalizedEvent];
   'alert.raised': [Alert];

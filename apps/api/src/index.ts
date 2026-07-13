@@ -36,13 +36,14 @@ import {
   createPrismaClient,
   attachAlert,
   getIncidentDetail,
+  patchIncident,
   getAlertsAndIncidentsForEvent,
   CORRELATION_WINDOW_MS,
   type PrismaClient,
 } from './incident/index.js';
 import { selectProvider, startAiEngine } from './ai/index.js';
 import { getSystemHealth } from './system/index.js';
-import { createAuthService, type AuthService } from './auth/index.js';
+import { createAuthService, listUsers, type AuthService } from './auth/index.js';
 
 const config = loadConfig();
 const log = createLogger({ name: 'api', level: config.LOG_LEVEL });
@@ -148,6 +149,8 @@ async function startRealtime(
   await createRealtimeServer(bus, config.PORT, {
     getMetrics: () => m.snapshot(),
     getIncidentDetail: (id) => getIncidentDetail(prisma, id),
+    patchIncident: (id, input) => patchIncident(prisma, id, input),
+    listUsers: () => listUsers(prisma),
     searchEvents: (params) => eventStore.search(params),
     getEventTrace: async (eventId) => {
       const [event, { alerts, incidents }] = await Promise.all([

@@ -1,6 +1,7 @@
 'use client';
 
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import type { Alert, Incident, IncidentSummary, NormalizedEvent } from '@argus/contracts';
 import { getToken } from './auth';
 
@@ -24,6 +25,7 @@ export interface PipelineActivity {
 
 type WsMessage =
   | { type: 'incident.created' | 'incident.updated'; incident: Incident; latestAlert: Alert }
+  | { type: 'incident.status_changed'; incident: Incident }
   | { type: 'summary.ready'; summary: IncidentSummary }
   | { type: 'event.normalized'; event: NormalizedEvent }
   | { type: 'alert.raised'; alert: Alert };
@@ -48,6 +50,7 @@ function emptyHours(): number[] {
 }
 
 export function RealtimeProvider({ children }: { children: ReactNode }) {
+  const queryClient = useQueryClient();
   const [incidents, setIncidents] = useState<IncidentRow[]>([]);
   const [summaries, setSummaries] = useState<Record<string, IncidentSummary>>({});
   const [connected, setConnected] = useState(false);
@@ -109,6 +112,24 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
           next[hour] = (next[hour] ?? 0) + 1;
           return next;
         });
+        return;
+      }
+
+      if (payload.type === 'incident.status_changed') {
+        queryClient.invalidateQueries({ queryKey: ['incident', payload.incident.incidentId] });
+        pushActivity(
+          'incident',
+          payload.incident.correlationKey,
+          `status → ${payload.incident.status}`,
+          payload.incident.updatedAt,
+        );
+        setIncidents((prev) =>
+          prev.map((row) =>
+            row.incident.incidentId === payload.incident.incidentId
+              ? { ...row, incident: payload.incident }
+              : row,
+          ),
+        );
         return;
       }
 

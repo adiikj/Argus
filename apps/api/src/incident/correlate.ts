@@ -33,6 +33,8 @@ export function correlate(
         updatedAt: nowIso,
         alertIds: [alert.alertId],
         eventIds: [...alert.eventIds],
+        assigneeId: null,
+        resolutionNote: null,
       },
     };
   }

@@ -1,8 +1,15 @@
 import Fastify from 'fastify';
 import websocketPlugin, { type WebSocket } from '@fastify/websocket';
-import type { Alert, Incident, IncidentSummary, NormalizedEvent } from '@argus/contracts';
+import {
+  IncidentPatch,
+  type Alert,
+  type Incident,
+  type IncidentSummary,
+  type NormalizedEvent,
+  type PublicUser,
+} from '@argus/contracts';
 import type { Bus, IncidentEvent } from '../bus/index.js';
-import type { IncidentDetail } from '../incident/index.js';
+import type { IncidentDetail, PatchIncidentResult } from '../incident/index.js';
 import type { EventSearchParams } from '../storage/index.js';
 import type { SystemHealth } from '../system/index.js';
 import type { AuthService } from '../auth/index.js';
@@ -29,6 +36,8 @@ export interface EventTrace {
 export interface RealtimeOptions {
   getMetrics?: () => unknown;
   getIncidentDetail?: (id: string) => Promise<IncidentDetail | undefined>;
+  patchIncident?: (id: string, input: IncidentPatch) => Promise<PatchIncidentResult>;
+  listUsers?: () => Promise<PublicUser[]>;
   searchEvents?: (params: EventSearchParams) => Promise<NormalizedEvent[]>;
   getEventTrace?: (eventId: string) => Promise<EventTrace>;
   getSystemHealth?: () => Promise<SystemHealth>;
@@ -130,6 +139,30 @@ export async function createRealtimeServer(bus: Bus, port: number, opts: Realtim
     return detail;
   });
 
+  app.patch('/incidents/:id', async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const body = IncidentPatch.safeParse(req.body);
+    if (!body.success) {
+      reply.code(400);
+      return { error: 'invalid patch body' };
+    }
+
+    const result = await opts.patchIncident?.(id, body.data);
+    if (!result) {
+      reply.code(404);
+      return { error: 'incident not found' };
+    }
+    if (!result.ok) {
+      reply.code(result.error === 'not_found' ? 404 : 400);
+      return { error: result.error };
+    }
+
+    bus.emit('incident.status_changed', { incident: result.incident });
+    return result.incident;
+  });
+
+  app.get('/users', async () => ({ users: (await opts.listUsers?.()) ?? [] }));
+
   app.get('/events', async (req) => {
     const { q, source, limit } = req.query as { q?: string; source?: string; limit?: string };
     const events =
@@ -164,6 +197,9 @@ export async function createRealtimeServer(bus: Bus, port: number, opts: Realtim
       send({ type, ...event });
   bus.on('incident.created', broadcastIncident('incident.created'));
   bus.on('incident.updated', broadcastIncident('incident.updated'));
+  bus.on('incident.status_changed', ({ incident }) =>
+    send({ type: 'incident.status_changed', incident }),
+  );
   bus.on('summary.ready', (summary: IncidentSummary) => send({ type: 'summary.ready', summary }));
   bus.on('event.normalized', (event: NormalizedEvent) => send({ type: 'event.normalized', event }));
   bus.on('alert.raised', (alert: Alert) => send({ type: 'alert.raised', alert }));
