@@ -1,6 +1,9 @@
 // Relational truth for alerts/incidents/summaries (architecture §5, §7). The
 // event stream itself lives in Elasticsearch — Postgres never stores events,
-// only the eventIds an alert/incident references.
+// only the eventIds an alert/incident references. STORAGE_PROFILE=lite is the
+// one exception: NormalizedEventRow below backs the event store in place of
+// Elasticsearch, full-text-searched via a functional GIN index (raw SQL in
+// the migration — Prisma has no schema syntax for functional indexes).
 
 generator client {
   provider = "prisma-client-js"
@@ -85,4 +88,38 @@ model Summary {
   incident Incident @relation(fields: [incidentId], references: [incidentId])
 
   @@map("summaries")
+}
+
+// mirrors @argus/contracts' NormalizedEvent — the Postgres-FTS event store
+// used when STORAGE_PROFILE=lite instead of Elasticsearch (§ above).
+model NormalizedEventRow {
+  eventId    String   @id @map("event_id")
+  timestamp  DateTime
+  source     String
+  sourceIp   String   @map("source_ip")
+  outcome    String
+  username   String?
+  method     String?
+  path       String?
+  statusCode Int?     @map("status_code")
+  userAgent  String?  @map("user_agent")
+  raw        String
+
+  @@index([timestamp])
+  @@index([source])
+  @@map("normalized_events")
+}
+
+// per-user accounts (email+password and/or Google). passwordHash null =
+// Google-only account; googleId null = email/password-only account. The same
+// email via both paths links onto one row (see auth/users.ts upsertGoogleUser).
+model User {
+  userId       String   @id @map("user_id")
+  email        String   @unique
+  passwordHash String?  @map("password_hash")
+  googleId     String?  @unique @map("google_id")
+  name         String?
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  @@map("users")
 }

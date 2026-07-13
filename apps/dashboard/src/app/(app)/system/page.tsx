@@ -85,21 +85,39 @@ export default function SystemHealthPage() {
           <motion.div {...fadeIn(0.08)}>
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0">
-                <CardTitle>Elasticsearch</CardTitle>
-                <Badge
-                  variant={
-                    (health.elasticsearch.status &&
-                      ES_STATUS_VARIANT[health.elasticsearch.status]) ||
-                    'critical'
-                  }
-                >
-                  {health.elasticsearch.status ?? 'unreachable'}
-                </Badge>
+                <CardTitle>
+                  {health.search.backend === 'elasticsearch' ? 'Elasticsearch' : 'Postgres (lite)'}
+                </CardTitle>
+                {health.search.backend === 'elasticsearch' ? (
+                  <Badge
+                    variant={
+                      (health.search.status && ES_STATUS_VARIANT[health.search.status]) ||
+                      'critical'
+                    }
+                  >
+                    {health.search.status ?? 'unreachable'}
+                  </Badge>
+                ) : (
+                  <StatusBadge
+                    ok={health.search.ok}
+                    label={health.search.ok ? 'connected' : 'unreachable'}
+                  />
+                )}
               </CardHeader>
               <CardContent>
                 <p className="text-sm text-text-secondary">
-                  Cluster health of the <code className="font-mono text-xs">normalized-events</code>{' '}
-                  index backing store.
+                  {health.search.backend === 'elasticsearch' ? (
+                    <>
+                      Cluster health of the{' '}
+                      <code className="font-mono text-xs">normalized-events</code> index backing
+                      store.
+                    </>
+                  ) : (
+                    <>
+                      STORAGE_PROFILE=lite — events are searched via Postgres full-text search
+                      instead of Elasticsearch.
+                    </>
+                  )}
                 </p>
               </CardContent>
             </Card>

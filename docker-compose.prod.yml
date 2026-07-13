@@ -106,8 +106,8 @@ services:
       LLM_PROVIDER: ${LLM_PROVIDER:-none}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       GROQ_API_KEY: ${GROQ_API_KEY:-}
-      SITE_PASSWORD: ${SITE_PASSWORD:-}
-      AUTH_SECRET: ${AUTH_SECRET:-}
+      AUTH_SECRET: ${AUTH_SECRET:?set a real secret in .env.prod}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
       CORS_ORIGIN: ${CORS_ORIGIN:-*}
       REDIS_URL: ${REDIS_URL:-}
     depends_on:
@@ -127,6 +127,9 @@ services:
       KAFKA_BROKERS: kafka:19092
       DEMO_MODE: ${DEMO_MODE:-true}
       CORS_ORIGIN: ${CORS_ORIGIN:-*}
+      # generator shares @argus/config's env schema even though it never uses
+      # auth — AUTH_SECRET is still required for loadConfig() to pass.
+      AUTH_SECRET: ${AUTH_SECRET:?set a real secret in .env.prod}
     depends_on:
       kafka: { condition: service_healthy }
 
@@ -139,6 +142,7 @@ services:
         # Point these at whatever hostnames the tunnel routes to (docs/deployment.md).
         NEXT_PUBLIC_WS_URL: ${NEXT_PUBLIC_WS_URL}
         NEXT_PUBLIC_GENERATOR_URL: ${NEXT_PUBLIC_GENERATOR_URL}
+        NEXT_PUBLIC_GOOGLE_CLIENT_ID: ${NEXT_PUBLIC_GOOGLE_CLIENT_ID:-}
     container_name: argus-dashboard
     restart: unless-stopped
     depends_on:

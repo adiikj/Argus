@@ -14,7 +14,7 @@ export {
   RedisWindowStore,
   type WindowStore,
 } from './window-store.js';
-export { InMemoryBaselineStore, type BaselineStore } from './baseline-store.js';
+export { InMemoryBaselineStore, RedisBaselineStore, type BaselineStore } from './baseline-store.js';
 
 // Day 6 rules are registered but their bodies are author-written (§19): each is
 // a safe no-op (returns undefined) until its TODO is filled in.

@@ -33,10 +33,15 @@ const EnvSchema = z.object({
     .default('false')
     .transform((v) => v === 'true'),
 
-  // single shared site password, not user accounts — leave blank to run with no gate
-  // (same "runs with zero keys" degradation as the LLM providers)
-  SITE_PASSWORD: z.string().optional(),
-  AUTH_SECRET: z.string().optional(),
+  // signs app JWTs for the per-user login system — always required. Enforcement
+  // of the gate itself is dynamic at runtime (apps/api/src/auth), not this var:
+  // the api runs fully open until the first account registers, then requires
+  // a valid session on every route from then on.
+  AUTH_SECRET: z.string().min(16, 'AUTH_SECRET must be at least 16 characters'),
+
+  // optional: enables "Sign in with Google" alongside email+password; leave
+  // blank to run email+password only (same optional-degradation as LLM_PROVIDER)
+  GOOGLE_CLIENT_ID: z.string().optional(),
 
   // '*' for local dev; set to the real dashboard hostname once one exists (post-deploy)
   CORS_ORIGIN: z.string().default('*'),

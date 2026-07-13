@@ -1,6 +1,6 @@
 import type { Kafka } from 'kafkajs';
-import type { Client } from '@elastic/elasticsearch';
 import type { PrismaClient } from '../incident/index.js';
+import type { EventStore } from '../storage/index.js';
 import { TOPICS, type Topic } from '../streaming/index.js';
 
 // every consumer group actually running in the composition root (index.ts) —
@@ -20,7 +20,7 @@ export interface ConsumerLag {
 
 export interface SystemHealth {
   kafka: { ok: boolean; consumerLag: ConsumerLag[] };
-  elasticsearch: { ok: boolean; status: string | null };
+  search: { ok: boolean; backend: 'elasticsearch' | 'postgres'; status: string | null };
   postgres: { ok: boolean; latencyMs: number | null };
 }
 
@@ -49,15 +49,6 @@ async function getConsumerLag(kafka: Kafka): Promise<{ ok: boolean; consumerLag:
   }
 }
 
-async function getEsHealth(esClient: Client): Promise<{ ok: boolean; status: string | null }> {
-  try {
-    const health = await esClient.cluster.health();
-    return { ok: health.status !== 'red', status: health.status };
-  } catch {
-    return { ok: false, status: null };
-  }
-}
-
 async function getPostgresHealth(
   prisma: PrismaClient,
 ): Promise<{ ok: boolean; latencyMs: number | null }> {
@@ -70,15 +61,22 @@ async function getPostgresHealth(
   }
 }
 
+// the event store itself knows how to check its own backend (ES cluster
+// health vs. a Postgres round trip) — see storage/index.ts.
 export async function getSystemHealth(
   kafka: Kafka,
-  esClient: Client,
   prisma: PrismaClient,
+  eventStore: EventStore,
 ): Promise<SystemHealth> {
-  const [kafka_, elasticsearch, postgres] = await Promise.all([
+  const [kafka_, postgres, search] = await Promise.all([
     getConsumerLag(kafka).catch((): SystemHealth['kafka'] => ({ ok: false, consumerLag: [] })),
-    getEsHealth(esClient),
     getPostgresHealth(prisma),
+    eventStore.checkHealth(),
   ]);
-  return { kafka: kafka_, elasticsearch, postgres };
+
+  return {
+    kafka: kafka_,
+    search: { backend: eventStore.backend, ok: search.ok, status: search.status },
+    postgres,
+  };
 }

@@ -19,8 +19,10 @@ COPY tsconfig.base.json ./tsconfig.base.json
 # at container runtime — they have to arrive as build args, not `environment:`.
 ARG NEXT_PUBLIC_WS_URL
 ARG NEXT_PUBLIC_GENERATOR_URL
+ARG NEXT_PUBLIC_GOOGLE_CLIENT_ID
 ENV NEXT_PUBLIC_WS_URL=$NEXT_PUBLIC_WS_URL
 ENV NEXT_PUBLIC_GENERATOR_URL=$NEXT_PUBLIC_GENERATOR_URL
+ENV NEXT_PUBLIC_GOOGLE_CLIENT_ID=$NEXT_PUBLIC_GOOGLE_CLIENT_ID
 
 RUN pnpm turbo run build --filter=@argus/dashboard
 

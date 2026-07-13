@@ -132,10 +132,14 @@ LLM_PROVIDER=groq            # or "gemini"
 GROQ_API_KEY=...             # or GEMINI_API_KEY
 ```
 
-### Optional: site password + rate limiting
+### Auth + rate limiting
 
-The dashboard and api run fully open by default. Set `SITE_PASSWORD` in `.env` to require a login
-(`/login`) before every route except the api's `/healthz`; leave it blank to keep everything
-unauthenticated, same "runs with zero keys" shape as the AI layer. The generator's
-`/simulate/:scenario` and every api REST endpoint are token-bucket rate limited regardless, so a
-public demo URL can't be scripted into hammering the LLM's free-tier quota.
+Real per-user accounts (email + password, plus optional "Sign in with Google") gate the console —
+`AUTH_SECRET` in `.env` signs sessions and is required. The gate itself is dynamic: a fresh install
+runs fully open until the first account registers at `/login`, then every route requires a valid
+session from then on, same bootstrap pattern self-hosted tools like Grafana/Gitea use. Set
+`GOOGLE_CLIENT_ID` (api) and `NEXT_PUBLIC_GOOGLE_CLIENT_ID` (dashboard, same value) to enable Google
+sign-in alongside email+password; leave both blank to run email+password only. The generator's
+`/simulate/:scenario` and every api REST endpoint are token-bucket rate limited regardless (login/
+register endpoints get a tighter limiter against brute-forcing), so a public demo URL can't be
+scripted into hammering the LLM's free-tier quota or guessing passwords.

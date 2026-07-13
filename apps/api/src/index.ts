@@ -14,10 +14,9 @@ import {
 import { parseRawLog } from './parser/index.js';
 import {
   createEsClient,
-  ensureEventsIndex,
-  indexEvent,
-  getEventById,
-  searchEvents,
+  createElasticEventStore,
+  createPostgresEventStore,
+  type EventStore,
 } from './storage/index.js';
 import {
   createRuleEngine,
@@ -26,6 +25,7 @@ import {
   InMemoryWindowStore,
   RedisWindowStore,
   InMemoryBaselineStore,
+  RedisBaselineStore,
   type WindowStore,
   type BaselineStore,
 } from './detection/index.js';
@@ -42,7 +42,7 @@ import {
 } from './incident/index.js';
 import { selectProvider, startAiEngine } from './ai/index.js';
 import { getSystemHealth } from './system/index.js';
-import type { AuthOptions } from './auth/index.js';
+import { createAuthService, type AuthService } from './auth/index.js';
 
 const config = loadConfig();
 const log = createLogger({ name: 'api', level: config.LOG_LEVEL });
@@ -69,19 +69,20 @@ async function startParser(kafka: Kafka, producer: StreamProducer, m: Metrics): 
   });
 }
 
-// storage: events.normalized -> Elasticsearch (independent of detection, §4).
-// Also feeds the live pipeline view: only broadcasts for entities a rule has
-// actually fired on recently, so background noise doesn't flood the socket.
+// storage: events.normalized -> the event store (Elasticsearch, or Postgres
+// under STORAGE_PROFILE=lite — independent of detection, §4). Also feeds the
+// live pipeline view: only broadcasts for entities a rule has actually fired
+// on recently, so background noise doesn't flood the socket.
 async function startStorage(
   kafka: Kafka,
-  esClient: ReturnType<typeof createEsClient>,
+  eventStore: EventStore,
   bus: Bus,
   hotEntities: HotEntities,
   m: Metrics,
 ): Promise<void> {
   await subscribe(kafka, 'api-es-writer', TOPICS.EVENTS_NORMALIZED, async (value) => {
     const event = NormalizedEvent.parse(value);
-    await indexEvent(esClient, event);
+    await eventStore.index(event);
     m.incr('eventsIndexed');
     log.debug({ eventId: event.eventId }, 'indexed normalized event');
     if (hotEntities.isHot(event.sourceIp)) bus.emit('event.normalized', event);
@@ -140,22 +141,22 @@ async function startRealtime(
   kafka: Kafka,
   bus: Bus,
   prisma: PrismaClient,
-  esClient: ReturnType<typeof createEsClient>,
+  eventStore: EventStore,
   m: Metrics,
-  auth: AuthOptions | undefined,
+  auth: AuthService,
 ): Promise<void> {
   await createRealtimeServer(bus, config.PORT, {
     getMetrics: () => m.snapshot(),
     getIncidentDetail: (id) => getIncidentDetail(prisma, id),
-    searchEvents: (params) => searchEvents(esClient, params),
+    searchEvents: (params) => eventStore.search(params),
     getEventTrace: async (eventId) => {
       const [event, { alerts, incidents }] = await Promise.all([
-        getEventById(esClient, eventId),
+        eventStore.getById(eventId),
         getAlertsAndIncidentsForEvent(prisma, eventId),
       ]);
       return { eventId, event, alerts, incidents };
     },
-    getSystemHealth: () => getSystemHealth(kafka, esClient, prisma),
+    getSystemHealth: () => getSystemHealth(kafka, prisma, eventStore),
     auth,
     corsOrigin: config.CORS_ORIGIN,
   });
@@ -173,40 +174,50 @@ function startAi(prisma: PrismaClient, bus: Bus, m: Metrics): void {
 const kafka = createKafkaClient(config);
 await ensureTopics(kafka);
 
-const esClient = createEsClient(config);
-await ensureEventsIndex(esClient);
-
 const prisma = createPrismaClient(config);
+
+// STORAGE_PROFILE=full backs the event store with Elasticsearch (default);
+// =lite uses Postgres FTS instead and never touches ES at all — no client,
+// no index to ensure.
+const eventStore: EventStore =
+  config.STORAGE_PROFILE === 'lite'
+    ? createPostgresEventStore(prisma)
+    : createElasticEventStore(createEsClient(config));
+await eventStore.ensure();
 
 const producer = await createProducer(kafka);
 const hotEntities = new HotEntities(CORRELATION_WINDOW_MS);
-const baselineStore: BaselineStore = new InMemoryBaselineStore();
 
 // no REDIS_URL -> everything stays in-process (single instance, no extra
-// infra); set it to back the window store + bus with Redis instead, so
-// detection state and event fanout survive across more than one api process.
+// infra); set it to back the window store, baseline store, and bus with
+// Redis instead, so detection state and event fanout survive across more
+// than one api process.
 let bus: Bus;
 let windowStore: WindowStore;
+let baselineStore: BaselineStore;
 if (config.REDIS_URL) {
   const redisClient = createClient({ url: config.REDIS_URL });
   const redisSubscriber = redisClient.duplicate();
   await Promise.all([redisClient.connect(), redisSubscriber.connect()]);
   windowStore = new RedisWindowStore(redisClient);
+  baselineStore = new RedisBaselineStore(redisClient);
   bus = await RedisBus.create(redisClient, redisSubscriber);
-  log.info({ redisUrl: config.REDIS_URL }, 'using Redis-backed window store + bus');
+  log.info({ redisUrl: config.REDIS_URL }, 'using Redis-backed window store, baseline store + bus');
 } else {
   windowStore = new InMemoryWindowStore();
+  baselineStore = new InMemoryBaselineStore();
   bus = createBus();
-  log.info('using in-memory window store + local bus (set REDIS_URL to distribute them)');
+  log.info('using in-memory window/baseline stores + local bus (set REDIS_URL to distribute them)');
 }
 
 await startParser(kafka, producer, metrics);
-await startStorage(kafka, esClient, bus, hotEntities, metrics);
+await startStorage(kafka, eventStore, bus, hotEntities, metrics);
 await startDetection(kafka, producer, bus, hotEntities, windowStore, baselineStore, metrics);
 await startIncident(kafka, prisma, bus, metrics);
-const auth: AuthOptions | undefined = config.SITE_PASSWORD
-  ? { sitePassword: config.SITE_PASSWORD, authSecret: config.AUTH_SECRET ?? config.SITE_PASSWORD }
-  : undefined;
+const authService = await createAuthService(prisma, {
+  authSecret: config.AUTH_SECRET,
+  googleClientId: config.GOOGLE_CLIENT_ID,
+});
 
-await startRealtime(kafka, bus, prisma, esClient, metrics, auth);
+await startRealtime(kafka, bus, prisma, eventStore, metrics, authService);
 startAi(prisma, bus, metrics);

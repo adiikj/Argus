@@ -1,4 +1,3 @@
-import { timingSafeEqual } from 'node:crypto';
 import Fastify from 'fastify';
 import websocketPlugin, { type WebSocket } from '@fastify/websocket';
 import type { Alert, Incident, IncidentSummary, NormalizedEvent } from '@argus/contracts';
@@ -6,21 +5,19 @@ import type { Bus, IncidentEvent } from '../bus/index.js';
 import type { IncidentDetail } from '../incident/index.js';
 import type { EventSearchParams } from '../storage/index.js';
 import type { SystemHealth } from '../system/index.js';
-import { signToken, verifyToken, type AuthOptions } from '../auth/index.js';
+import type { AuthService } from '../auth/index.js';
 import { RateLimiter } from './rate-limit.js';
 
-const UNGATED_PATHS = ['/healthz', '/auth/login', '/auth/status'];
+const UNGATED_PATHS = ['/healthz', '/auth/login', '/auth/register', '/auth/google', '/auth/status'];
 
 // 40 immediate requests, refilling at 5/sec (300/min sustained) — comfortably
 // above normal dashboard polling (/metrics every 3s, /system/health every 5s
 // per open tab), but still a real ceiling against a hammering script.
 const REQUEST_LIMITER = new RateLimiter(40, 5);
 
-function safeEqual(a: string, b: string): boolean {
-  const bufA = Buffer.from(a);
-  const bufB = Buffer.from(b);
-  return bufA.length === bufB.length && timingSafeEqual(bufA, bufB);
-}
+// tighter brute-force ceiling on the auth endpoints specifically: 5 immediate
+// attempts, refilling at 1 every 5s (12/min sustained).
+const AUTH_LIMITER = new RateLimiter(5, 0.2);
 
 export interface EventTrace {
   eventId: string;
@@ -35,11 +32,11 @@ export interface RealtimeOptions {
   searchEvents?: (params: EventSearchParams) => Promise<NormalizedEvent[]>;
   getEventTrace?: (eventId: string) => Promise<EventTrace>;
   getSystemHealth?: () => Promise<SystemHealth>;
-  auth?: AuthOptions;
+  auth: AuthService;
   corsOrigin?: string;
 }
 
-export async function createRealtimeServer(bus: Bus, port: number, opts: RealtimeOptions = {}) {
+export async function createRealtimeServer(bus: Bus, port: number, opts: RealtimeOptions) {
   const app = Fastify();
   await app.register(websocketPlugin);
 
@@ -56,14 +53,22 @@ export async function createRealtimeServer(bus: Bus, port: number, opts: Realtim
   });
 
   app.addHook('onRequest', async (req, reply) => {
-    if (!opts.auth) return; // no SITE_PASSWORD configured — gate is a no-op
+    if (!req.url.startsWith('/auth/login') && !req.url.startsWith('/auth/register')) return;
+    if (!AUTH_LIMITER.tryConsume(req.ip)) {
+      reply.code(429).send({ error: 'too many attempts — try again shortly' });
+    }
+  });
+
+  app.addHook('onRequest', async (req, reply) => {
+    if (!opts.auth.isRequired()) return; // no account registered yet — gate is a no-op
     if (UNGATED_PATHS.some((path) => req.url.startsWith(path))) return;
 
     const bearer = req.headers.authorization?.replace(/^Bearer\s+/i, '');
     const queryToken = (req.query as { token?: string } | undefined)?.token;
     const token = bearer ?? queryToken;
 
-    if (!token || !(await verifyToken(token, opts.auth.authSecret))) {
+    const payload = token ? await opts.auth.verify(token) : undefined;
+    if (!payload) {
       reply.code(401).send({ error: 'unauthorized' });
     }
   });
@@ -77,20 +82,40 @@ export async function createRealtimeServer(bus: Bus, port: number, opts: Realtim
 
   app.get('/healthz', async () => ({ status: 'ok', clients: sockets.size }));
 
-  app.get('/auth/status', async () => ({ required: Boolean(opts.auth) }));
+  app.get('/auth/status', async () => ({ required: opts.auth.isRequired() }));
+
+  app.post('/auth/register', async (req, reply) => {
+    const { email, password } = (req.body ?? {}) as { email?: string; password?: string };
+    if (!email?.includes('@') || !password || password.length < 8) {
+      reply.code(400);
+      return { error: 'valid email and password (min 8 chars) required' };
+    }
+    const result = await opts.auth.register(email, password);
+    if (!result) {
+      reply.code(409);
+      return { error: 'account already exists' };
+    }
+    return { token: result.token };
+  });
 
   app.post('/auth/login', async (req, reply) => {
-    if (!opts.auth) {
-      reply.code(404);
-      return { error: 'auth not configured' };
-    }
-    const { password } = (req.body ?? {}) as { password?: string };
-    if (!password || !safeEqual(password, opts.auth.sitePassword)) {
+    const { email, password } = (req.body ?? {}) as { email?: string; password?: string };
+    const result = email && password ? await opts.auth.login(email, password) : undefined;
+    if (!result) {
       reply.code(401);
-      return { error: 'invalid password' };
+      return { error: 'invalid email or password' };
     }
-    const token = await signToken(opts.auth.authSecret);
-    return { token };
+    return { token: result.token };
+  });
+
+  app.post('/auth/google', async (req, reply) => {
+    const { credential } = (req.body ?? {}) as { credential?: string };
+    const result = credential ? await opts.auth.loginWithGoogle(credential) : undefined;
+    if (!result) {
+      reply.code(401);
+      return { error: 'invalid Google credential' };
+    }
+    return { token: result.token };
   });
 
   app.get('/metrics', async () => opts.getMetrics?.() ?? {});
@@ -122,7 +147,7 @@ export async function createRealtimeServer(bus: Bus, port: number, opts: Realtim
     if (!opts.getSystemHealth) {
       return {
         kafka: { ok: false, consumerLag: [] },
-        elasticsearch: { ok: false, status: null },
+        search: { ok: false, backend: 'elasticsearch', status: null },
         postgres: { ok: false, latencyMs: null },
       };
     }

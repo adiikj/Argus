@@ -12,7 +12,7 @@ export interface ConsumerLag {
 
 export interface SystemHealth {
   kafka: { ok: boolean; consumerLag: ConsumerLag[] };
-  elasticsearch: { ok: boolean; status: string | null };
+  search: { ok: boolean; backend: 'elasticsearch' | 'postgres'; status: string | null };
   postgres: { ok: boolean; latencyMs: number | null };
 }
 
