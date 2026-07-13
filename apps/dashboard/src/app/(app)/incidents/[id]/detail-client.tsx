@@ -13,6 +13,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
+import { KillChain } from '../../_components/kill-chain';
 
 function formatDateTime(iso: string): string {
   return new Date(iso).toLocaleString(undefined, { hour12: false });
@@ -258,7 +259,11 @@ export function IncidentDetailClient({ id }: { id: string }) {
         </Card>
       </motion.div>
 
-      <motion.div {...fadeIn(0.24)}>
+      <motion.div {...fadeIn(0.22)}>
+        <KillChain alerts={alerts} />
+      </motion.div>
+
+      <motion.div {...fadeIn(0.28)}>
         <Card>
           <CardHeader>
             <CardTitle>
