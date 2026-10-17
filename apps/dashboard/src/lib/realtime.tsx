@@ -172,7 +172,8 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
             [payload.alert.ruleId]: (prev[payload.alert.ruleId] ?? 0) + 1,
           }));
           setHourlyActivity((prev) => {
-            const hour = new Date(payload.alert.timestamp).getHours();
+            // UTC, matching the server-side backfill (GET /incidents)
+            const hour = new Date(payload.alert.timestamp).getUTCHours();
             const next = [...prev];
             next[hour] = (next[hour] ?? 0) + 1;
             return next;

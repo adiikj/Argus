@@ -22,12 +22,14 @@ export async function getRecentActivity(prisma: PrismaClient): Promise<RecentAct
   const grouped = await prisma.alert.groupBy({ by: ['ruleId'], _count: { ruleId: true } });
   const ruleCounts = Object.fromEntries(grouped.map((g) => [g.ruleId, g._count.ruleId]));
 
+  // alerts by UTC hour of day, counted in Postgres: 24 rows back instead of
+  // every alert ever recorded (alerts are never pruned, so loading their
+  // timestamps made this endpoint slower every day)
   const hourlyActivity = Array.from({ length: 24 }, () => 0);
-  const timestamps = await prisma.alert.findMany({ select: { timestamp: true } });
-  for (const { timestamp } of timestamps) {
-    const hour = timestamp.getHours();
-    hourlyActivity[hour] = (hourlyActivity[hour] ?? 0) + 1;
-  }
+  const byHour = await prisma.$queryRaw<Array<{ hour: number; count: number }>>`
+    SELECT EXTRACT(HOUR FROM "timestamp")::int AS hour, COUNT(*)::int AS count
+    FROM alerts GROUP BY 1`;
+  for (const { hour, count } of byHour) hourlyActivity[hour] = count;
 
   return { incidents, ruleCounts, hourlyActivity };
 }

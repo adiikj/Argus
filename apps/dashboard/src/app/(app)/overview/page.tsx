@@ -367,7 +367,7 @@ export default function OverviewPage() {
       <motion.div className="mt-4" {...fadeIn(0.48)}>
         <Card>
           <CardHeader>
-            <CardTitle>Activity by hour</CardTitle>
+            <CardTitle>Activity by hour (UTC)</CardTitle>
           </CardHeader>
           <CardContent className="pb-4">
             <ActivityHeatmap hourly={hourlyActivity} />
