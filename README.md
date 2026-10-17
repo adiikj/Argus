@@ -82,6 +82,22 @@ nothing. Injection rules decode payloads repeatedly and leniently, so double enc
 | Execution | `command-injection` | OS command injection attempt | high | [T1059.004](https://attack.mitre.org/techniques/T1059/004/) Command and Scripting Interpreter: Unix Shell | Execution |
 | Impact | `api-rate-abuse` | API rate abuse | medium | [T1499.003](https://attack.mitre.org/techniques/T1499/003/) Endpoint Denial of Service: Application Exhaustion Flood | Impact |
 
+## Real attack traffic
+
+The deployed instance doesn't run on simulated data alone. nginx in front of the public api writes
+a second access log containing **only requests for paths the api doesn't serve** (`/.env`,
+`/wp-login.php`, `/cgi-bin/…`). Real dashboard users never appear in it; internet scanners and exploit
+kits do. The generator tails that log into Kafka next to the synthetic traffic. It follows logrotate
+and caps throughput per source and overall. From there it goes through the same parser, rules,
+incidents and AI summaries. The engine **throttles alerts** to one per rule and source per minute
+(the next one reports how many it stood in for), so a scanner sending thousands of requests stays a
+readable incident.
+
+Incidents from real public IPs get **threat-intel enrichment** from AbuseIPDB: abuse confidence,
+report count, ISP and usage type, and Tor exit status. It's shown on the incident page and given to
+the AI summarizer. Lookups are cached in Postgres for a day and capped below the free tier's daily
+quota, and they back off on HTTP 429. Demo and internal IPs are never sent out.
+
 ## Stack
 
 Node 24 · TypeScript (strict) · Fastify · Kafka (KRaft) · Elasticsearch · PostgreSQL (Prisma) ·
