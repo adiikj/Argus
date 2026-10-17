@@ -57,6 +57,31 @@ graph LR
     PG -.->|incident detail, trace lookups| REALTIME
 ```
 
+## Detection coverage
+
+12 rules mapped to 11 MITRE ATT&CK techniques across 6 tactics. The mapping lives in one place,
+`packages/contracts/src/rules.ts`, which drives the dashboard's ATT&CK badges, the kill-chain view,
+the **Detection Coverage** page, and the AI summaries. Every rule has unit tests, including benign
+look-alikes that must not fire. An end-to-end test runs every simulator scenario through the real
+parser and engine to prove it trips its rule, and runs benign background traffic to prove it trips
+nothing. Injection rules decode payloads repeatedly and leniently, so double encoding and a junk
+`%zz` escape don't get a payload past them.
+
+| Stage | Rule | Detects | Severity | MITRE ATT&CK technique | Tactic |
+|---|---|---|---|---|---|
+| Recon | `dir-enumeration` | Sensitive path enumeration | medium | [T1595.003](https://attack.mitre.org/techniques/T1595/003/) Active Scanning: Wordlist Scanning | Reconnaissance |
+| Recon | `scanner-user-agent` | Attack tool fingerprint | low | [T1595.002](https://attack.mitre.org/techniques/T1595/002/) Active Scanning: Vulnerability Scanning | Reconnaissance |
+| Recon | `traffic-anomaly` | Traffic anomaly | medium | [T1595](https://attack.mitre.org/techniques/T1595/) Active Scanning | Reconnaissance |
+| Access | `brute-force-ssh` | SSH brute force | high | [T1110.001](https://attack.mitre.org/techniques/T1110/001/) Brute Force: Password Guessing | Credential Access |
+| Access | `password-spraying` | Password spraying | high | [T1110.003](https://attack.mitre.org/techniques/T1110/003/) Brute Force: Password Spraying | Credential Access |
+| Access | `login-after-brute-force` | Login after brute force | critical | [T1078](https://attack.mitre.org/techniques/T1078/) Valid Accounts | Initial Access |
+| Access | `sqli-attempt` | SQL injection attempt | high | [T1190](https://attack.mitre.org/techniques/T1190/) Exploit Public-Facing Application | Initial Access |
+| Access | `path-traversal` | Path traversal attempt | high | [T1190](https://attack.mitre.org/techniques/T1190/) Exploit Public-Facing Application | Initial Access |
+| Access | `invalid-jwt` | Invalid token use | low | [T1550.001](https://attack.mitre.org/techniques/T1550/001/) Use Alternate Authentication Material: Application Access Token | Defense Evasion |
+| Execution | `xss-attempt` | Cross-site scripting attempt | medium | [T1059.007](https://attack.mitre.org/techniques/T1059/007/) Command and Scripting Interpreter: JavaScript | Execution |
+| Execution | `command-injection` | OS command injection attempt | high | [T1059.004](https://attack.mitre.org/techniques/T1059/004/) Command and Scripting Interpreter: Unix Shell | Execution |
+| Impact | `api-rate-abuse` | API rate abuse | medium | [T1499.003](https://attack.mitre.org/techniques/T1499/003/) Endpoint Denial of Service: Application Exhaustion Flood | Impact |
+
 ## Stack
 
 Node 24 · TypeScript (strict) · Fastify · Kafka (KRaft) · Elasticsearch · PostgreSQL (Prisma) ·
@@ -107,7 +132,7 @@ pnpm dev
 Then open the dashboard at **http://localhost:3000** — the landing page links straight into the live
 console. The generator emits low-rate benign background traffic immediately, so the feed is never
 empty; use the **Attack Simulator** page (or `POST http://localhost:4200/simulate/:scenario`) to fire
-one of five attack scenarios on demand and watch it become an alert, an incident, and an AI summary
+one of ten attack scenarios on demand and watch it become an alert, an incident, and an AI summary
 in real time.
 
 
