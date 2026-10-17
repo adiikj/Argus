@@ -13,10 +13,10 @@ out/
 **/generated/
 prisma/*.db
 
-# Env / secrets
+# Env / secrets — every real env file; only the *.example templates are tracked
 .env
-.env.local
-.env.*.local
+.env.*
+!.env*.example
 
 # Logs
 *.log
