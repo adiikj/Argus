@@ -170,6 +170,7 @@ async function startRealtime(
     getSystemHealth: () => getSystemHealth(kafka, prisma, eventStore),
     auth,
     corsOrigin: config.CORS_ORIGIN,
+    trustProxy: config.TRUST_PROXY,
   });
   log.info({ port: config.PORT }, 'realtime WS + REST (incidents, events, trace) listening');
 }

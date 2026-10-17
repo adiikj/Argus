@@ -3,6 +3,33 @@ import { dirname, join } from 'node:path';
 import { config as loadDotenv } from 'dotenv';
 import { z } from 'zod';
 
+// how many reverse-proxy hops sit in front of the api/generator (e.g. 1 for
+// nginx/Caddy/cloudflared), or a comma list of proxy IPs/CIDRs. Decides which
+// X-Forwarded-For entry becomes req.ip — the key every rate limiter uses.
+// 'false' (default) = no proxy, use the socket address. 'true' is rejected on
+// purpose: trusting every hop makes req.ip the *left-most* XFF entry, which the
+// client writes itself — anyone could dodge the limiters by forging the header.
+export const TrustProxy = z
+  .string()
+  .default('false')
+  .transform((raw, ctx): false | number | string[] => {
+    const value = raw.trim();
+    if (value === '' || value === 'false' || value === '0') return false;
+    if (value === 'true') {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message:
+          "'true' trusts client-supplied X-Forwarded-For — use a hop count (e.g. 1) or proxy IPs/CIDRs",
+      });
+      return z.NEVER;
+    }
+    if (/^\d+$/.test(value)) return Number(value);
+    return value
+      .split(',')
+      .map((entry) => entry.trim())
+      .filter(Boolean);
+  });
+
 const EnvSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace']).default('info'),
@@ -48,6 +75,8 @@ const EnvSchema = z.object({
 
   // '*' for local dev; set to the real dashboard hostname once one exists (post-deploy)
   CORS_ORIGIN: z.string().default('*'),
+
+  TRUST_PROXY: TrustProxy,
 
   // leave blank to keep the window store + bus in-process (single instance, no
   // extra infra); set it to back both with Redis (sorted sets / pub-sub) so

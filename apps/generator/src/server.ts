@@ -1,4 +1,5 @@
 import Fastify from 'fastify';
+import type { AppConfig } from '@argus/config';
 import type { Logger } from '@argus/logger';
 import { SCENARIOS, SCENARIO_NAMES } from './scenarios.js';
 import { RateLimiter } from './rate-limit.js';
@@ -12,6 +13,8 @@ export interface SimulatorDeps {
   port: number;
   log: Logger;
   corsOrigin?: string;
+  // see TRUST_PROXY in @argus/config — decides what req.ip (the rate-limit key) is
+  trustProxy?: AppConfig['TRUST_PROXY'];
   // returns how many raw logs the scenario emitted
   runScenario: (name: string) => Promise<number>;
 }
@@ -20,7 +23,7 @@ export interface SimulatorDeps {
 // list the scenarios, fire one, and a healthcheck. Permissive CORS so the
 // dashboard control panel (a different origin, Day 10) can call it.
 export async function createSimulatorServer(deps: SimulatorDeps) {
-  const app = Fastify();
+  const app = Fastify({ trustProxy: deps.trustProxy ?? false });
 
   app.addHook('onRequest', async (req, reply) => {
     reply.header('access-control-allow-origin', deps.corsOrigin ?? '*');

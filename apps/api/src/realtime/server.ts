@@ -10,6 +10,7 @@ import {
   type PublicUser,
   type RecentActivity,
 } from '@argus/contracts';
+import type { AppConfig } from '@argus/config';
 import type { Bus, IncidentEvent } from '../bus/index.js';
 import type { IncidentDetail, PatchIncidentResult } from '../incident/index.js';
 import type { EventSearchParams } from '../storage/index.js';
@@ -47,10 +48,12 @@ export interface RealtimeOptions {
   getSystemHealth?: () => Promise<SystemHealth>;
   auth: AuthService;
   corsOrigin?: string;
+  // see TRUST_PROXY in @argus/config — decides what req.ip (the rate-limit key) is
+  trustProxy?: AppConfig['TRUST_PROXY'];
 }
 
 export async function createRealtimeServer(bus: Bus, port: number, opts: RealtimeOptions) {
-  const app = Fastify();
+  const app = Fastify({ trustProxy: opts.trustProxy ?? false });
   await app.register(websocketPlugin);
 
   const corsOrigin = opts.corsOrigin ?? '*';

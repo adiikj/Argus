@@ -44,6 +44,7 @@ await createSimulatorServer({
   log,
   runScenario,
   corsOrigin: config.CORS_ORIGIN,
+  trustProxy: config.TRUST_PROXY,
 });
 log.info({ port: config.GENERATOR_PORT, scenarios: SCENARIO_NAMES }, 'simulator API listening');
 

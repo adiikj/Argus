@@ -126,6 +126,8 @@ services:
       AUTH_SECRET: ${AUTH_SECRET:?set a real secret in .env.prod}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
       CORS_ORIGIN: ${CORS_ORIGIN:-*}
+      # one hop: cloudflared sits in front, so its X-Forwarded-For entry is the real client
+      TRUST_PROXY: ${TRUST_PROXY:-1}
       REDIS_URL: ${REDIS_URL:-}
       SLACK_WEBHOOK_URL: ${SLACK_WEBHOOK_URL:-}
       DASHBOARD_URL: ${DASHBOARD_URL:-}
@@ -147,6 +149,7 @@ services:
       KAFKA_BROKERS: kafka:19092
       DEMO_MODE: ${DEMO_MODE:-true}
       CORS_ORIGIN: ${CORS_ORIGIN:-*}
+      TRUST_PROXY: ${TRUST_PROXY:-1}
       # generator shares @argus/config's env schema even though it never uses
       # auth — AUTH_SECRET is still required for loadConfig() to pass.
       AUTH_SECRET: ${AUTH_SECRET:?set a real secret in .env.prod}
