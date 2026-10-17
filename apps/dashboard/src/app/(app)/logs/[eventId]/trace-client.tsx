@@ -8,6 +8,7 @@ import { useEventTrace } from '@/lib/use-event-trace';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
+import { AttackTechnique } from '../../_components/attack-technique';
 
 function formatDateTime(iso: string): string {
   return new Date(iso).toLocaleString(undefined, { hour12: false });
@@ -122,6 +123,7 @@ export function TraceClient({ eventId }: { eventId: string }) {
                   <span className="rounded bg-bg-elevated px-2 py-0.5 font-mono text-[11px] text-text-secondary">
                     {alert.ruleId}
                   </span>
+                  <AttackTechnique ruleId={alert.ruleId} link />
                   <span className="flex-1 truncate text-sm text-text-primary">{alert.message}</span>
                 </CardContent>
               </Card>

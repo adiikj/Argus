@@ -1,6 +1,7 @@
 import { IncidentQuery } from '@argus/contracts';
 import {
   KNOWN_RULE_IDS,
+  alertLine,
   type LLMProvider,
   type SummaryDraft,
   type SummaryInput,
@@ -9,7 +10,7 @@ import {
 const DEFAULT_MODEL = 'llama-3.3-70b-versatile';
 
 function buildPrompt({ incident, alerts }: SummaryInput): string {
-  const lines = alerts.map((a) => `- [${a.severity}] ${a.ruleId}: ${a.message}`).join('\n');
+  const lines = alerts.map(alertLine).join('\n');
   return [
     `Security incident from entity ${incident.correlationKey}, severity ${incident.severity}.`,
     `Alerts (${alerts.length}):`,
@@ -41,7 +42,7 @@ export function createGroqProvider(apiKey: string, model: string = DEFAULT_MODEL
             {
               role: 'system',
               content:
-                'You are a SOC analyst assistant. Reply with JSON only: {"summary": string, "iocs": string[], "recommendedActions": string[]}.',
+                'You are a SOC analyst assistant. Where relevant, cite the MITRE ATT&CK technique IDs given for each alert. Reply with JSON only: {"summary": string, "iocs": string[], "recommendedActions": string[]}.',
             },
             { role: 'user', content: buildPrompt(input) },
           ],

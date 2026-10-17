@@ -15,6 +15,7 @@ import { Separator } from '@/components/ui/separator';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { KillChain } from '../../_components/kill-chain';
+import { AttackTechnique } from '../../_components/attack-technique';
 
 function formatDateTime(iso: string): string {
   return new Date(iso).toLocaleString(undefined, { hour12: false });
@@ -309,6 +310,7 @@ export function IncidentDetailClient({ id }: { id: string }) {
                     <span className="shrink-0 rounded bg-bg-elevated px-2 py-0.5 font-mono text-[11px] text-text-secondary">
                       {alert.ruleId}
                     </span>
+                    <AttackTechnique ruleId={alert.ruleId} link />
                     <span className="flex-1 truncate text-sm text-text-primary">
                       {alert.message}
                     </span>

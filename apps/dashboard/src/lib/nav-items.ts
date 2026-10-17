@@ -4,6 +4,7 @@ import {
   FileText,
   Search,
   Crosshair,
+  ShieldCheck,
   HeartPulse,
 } from 'lucide-react';
 
@@ -13,5 +14,6 @@ export const NAV_ITEMS = [
   { href: '/incidents', label: 'Incident Details', icon: FileText },
   { href: '/logs', label: 'Log Explorer', icon: Search },
   { href: '/simulator', label: 'Attack Simulator', icon: Crosshair },
+  { href: '/coverage', label: 'Detection Coverage', icon: ShieldCheck },
   { href: '/system', label: 'System Health', icon: HeartPulse },
 ];

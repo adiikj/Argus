@@ -1,6 +1,7 @@
 import { IncidentQuery } from '@argus/contracts';
 import {
   KNOWN_RULE_IDS,
+  alertLine,
   type LLMProvider,
   type SummaryDraft,
   type SummaryInput,
@@ -30,12 +31,13 @@ const QUERY_RESPONSE_SCHEMA = {
 };
 
 function buildPrompt({ incident, alerts }: SummaryInput): string {
-  const lines = alerts.map((a) => `- [${a.severity}] ${a.ruleId}: ${a.message}`).join('\n');
+  const lines = alerts.map(alertLine).join('\n');
   return [
     `Security incident from entity ${incident.correlationKey}, severity ${incident.severity}.`,
     `Alerts (${alerts.length}):`,
     lines,
     'Summarize this incident for a SOC analyst, list indicators of compromise, and recommend next actions.',
+    'Where relevant, cite the MITRE ATT&CK technique IDs given for each alert.',
   ].join('\n');
 }
 

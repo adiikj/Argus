@@ -42,6 +42,18 @@ describe('templateProvider', () => {
   });
 });
 
+describe('templateProvider ATT&CK context', () => {
+  it('cites the technique, tactic and the rule playbook for known rules', async () => {
+    const draft = await templateProvider.summarize({
+      incident: incident(),
+      alerts: [alert('brute-force-ssh')],
+    });
+    expect(draft.summary).toContain('brute-force-ssh [T1110.001]');
+    expect(draft.summary).toContain('Credential Access');
+    expect(draft.recommendedActions.some((a) => a.includes('fail2ban'))).toBe(true);
+  });
+});
+
 describe('templateProvider.translateQuery', () => {
   it('extracts a known rule id from a keyword', async () => {
     const filter = await templateProvider.translateQuery('show sqli incidents');

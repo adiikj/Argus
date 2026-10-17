@@ -1,44 +1,39 @@
-import { Search, KeyRound, Zap, type LucideIcon } from 'lucide-react';
+import { Search, KeyRound, Terminal, Zap, type LucideIcon } from 'lucide-react';
 import type { Alert } from '@argus/contracts';
+import { ATTACK_STAGES, ruleInfo, type AttackStage } from '@argus/contracts/rules';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
+import { AttackTechnique } from './attack-technique';
 
-type Stage = 'recon' | 'access' | 'impact';
+type Stage = AttackStage;
 
-const STAGE_ORDER: Stage[] = ['recon', 'access', 'impact'];
+const STAGE_ORDER = ATTACK_STAGES;
 
 const STAGE_LABEL: Record<Stage, string> = {
   recon: 'Reconnaissance',
   access: 'Access attempt',
+  execution: 'Execution',
   impact: 'Impact',
 };
 
 const STAGE_ICON: Record<Stage, LucideIcon> = {
   recon: Search,
   access: KeyRound,
+  execution: Terminal,
   impact: Zap,
 };
 
-// maps each of the six live detection rules to the stage of an attack it
-// actually represents — not a full MITRE ATT&CK mapping, just what this
-// rule set genuinely covers.
-const RULE_STAGE: Record<string, Stage> = {
-  'dir-enumeration': 'recon',
-  'traffic-anomaly': 'recon',
-  'brute-force-ssh': 'access',
-  'sqli-attempt': 'access',
-  'invalid-jwt': 'access',
-  'api-rate-abuse': 'impact',
-};
-
+// each rule's stage comes from the shared rule catalog (@argus/contracts/rules),
+// alongside its MITRE ATT&CK technique — shown per stage below
 export function KillChain({ alerts }: { alerts: Alert[] }) {
   const rulesByStage: Record<Stage, Set<string>> = {
     recon: new Set(),
     access: new Set(),
+    execution: new Set(),
     impact: new Set(),
   };
   for (const alert of alerts) {
-    const stage = RULE_STAGE[alert.ruleId];
+    const stage = ruleInfo(alert.ruleId)?.stage;
     if (stage) rulesByStage[stage].add(alert.ruleId);
   }
 
@@ -74,8 +69,10 @@ export function KillChain({ alerts }: { alerts: Alert[] }) {
                   >
                     {STAGE_LABEL[stage]}
                   </span>
-                  <span className="max-w-[7rem] text-[11px] leading-snug text-text-secondary">
-                    {hit ? rules.join(', ') : '—'}
+                  <span className="flex max-w-[8rem] flex-wrap justify-center gap-1 text-[11px] leading-snug text-text-secondary">
+                    {hit
+                      ? rules.map((ruleId) => <AttackTechnique key={ruleId} ruleId={ruleId} link />)
+                      : '—'}
                   </span>
                 </div>
                 {i < STAGE_ORDER.length - 1 && (

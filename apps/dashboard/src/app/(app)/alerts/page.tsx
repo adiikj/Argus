@@ -11,6 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { AttackTechnique } from '../_components/attack-technique';
 
 const SEVERITY_ORDER: Severity[] = ['critical', 'high', 'medium', 'low', 'info'];
 
@@ -194,6 +195,11 @@ export default function AlertsPage() {
                             <span className="hidden shrink-0 rounded bg-bg-elevated px-2 py-0.5 font-mono text-[11px] text-text-secondary sm:inline">
                               {latestAlert.ruleId}
                             </span>
+                            {/* row is already a link — chip only, no nested <a> */}
+                            <AttackTechnique
+                              ruleId={latestAlert.ruleId}
+                              className="hidden md:inline"
+                            />
                             <span className="shrink-0 font-mono text-sm text-text-secondary">
                               {incident.correlationKey}
                             </span>

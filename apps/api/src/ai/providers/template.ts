@@ -1,4 +1,5 @@
 import { IncidentQuery, type IncidentStatus, type Severity } from '@argus/contracts';
+import { ruleInfo } from '@argus/contracts/rules';
 import type { LLMProvider } from '../provider.js';
 import { KNOWN_RULE_IDS } from '../provider.js';
 
@@ -43,13 +44,20 @@ export const templateProvider: LLMProvider = {
   name: 'template',
   async summarize({ incident, alerts }) {
     const rules = [...new Set(alerts.map((a) => a.ruleId))];
+    const described = rules.map((id) => {
+      const technique = ruleInfo(id)?.technique.id;
+      return technique ? `${id} [${technique}]` : id;
+    });
+    const tactics = [...new Set(rules.flatMap((id) => ruleInfo(id)?.tactic.name ?? []))];
+    // the catalog's per-rule first-response steps, deduped across rules
+    const playbook = [...new Set(rules.flatMap((id) => ruleInfo(id)?.response ?? []))];
     return {
-      summary: `${alerts.length} alert(s) from ${incident.correlationKey} across ${rules.length} rule(s): ${rules.join(', ')}. Current severity: ${incident.severity}.`,
+      summary:
+        `${alerts.length} alert(s) from ${incident.correlationKey} across ${rules.length} rule(s): ${described.join(', ')}. ` +
+        (tactics.length > 0 ? `MITRE ATT&CK tactics: ${tactics.join(', ')}. ` : '') +
+        `Current severity: ${incident.severity}.`,
       iocs: [incident.correlationKey],
-      recommendedActions: [
-        `Investigate activity from ${incident.correlationKey}`,
-        'Confirm with the relevant rule owners before taking action',
-      ],
+      recommendedActions: [`Investigate activity from ${incident.correlationKey}`, ...playbook],
     };
   },
   // zero-network keyword/regex parser — the always-available fallback tier,
