@@ -195,12 +195,120 @@ button:not(:disabled) {
   animation: packet 2.4s linear infinite;
 }
 
+/* hero map: an arc draws in from its source, holds, then fades */
+@keyframes arc {
+  0% {
+    stroke-dasharray: 1;
+    stroke-dashoffset: 1;
+    opacity: 0;
+  }
+  8% {
+    opacity: 0.9;
+  }
+  30%,
+  55% {
+    stroke-dasharray: 1;
+    stroke-dashoffset: 0;
+    opacity: 0.9;
+  }
+  75%,
+  100% {
+    stroke-dasharray: 1;
+    stroke-dashoffset: 0;
+    opacity: 0;
+  }
+}
+
+.animate-arc {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  opacity: 0;
+  animation: arc 6.6s ease-out infinite;
+}
+
+/* a soft ring expanding off a map pin */
+@keyframes ping-soft {
+  0% {
+    transform: scale(1);
+    opacity: 0.55;
+  }
+  40%,
+  100% {
+    transform: scale(3.2);
+    opacity: 0;
+  }
+}
+
+.animate-ping-soft {
+  animation: ping-soft 6.6s ease-out infinite;
+  transform-origin: center;
+  transform-box: fill-box;
+}
+
+/* a packet crossing a pipeline connector */
+@keyframes travel-x {
+  from {
+    left: 0;
+    opacity: 0;
+  }
+  15%,
+  85% {
+    opacity: 1;
+  }
+  to {
+    left: calc(100% - 6px);
+    opacity: 0;
+  }
+}
+
+@keyframes travel-y {
+  from {
+    top: 0;
+    opacity: 0;
+  }
+  15%,
+  85% {
+    opacity: 1;
+  }
+  to {
+    top: calc(100% - 6px);
+    opacity: 0;
+  }
+}
+
+.animate-travel-x {
+  animation: travel-x 2.7s ease-in-out infinite;
+}
+
+.animate-travel-y {
+  animation: travel-y 2.7s ease-in-out infinite;
+}
+
+/* the product tour's per-tab progress bar */
+@keyframes tour-progress {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .animate-packet,
+  .animate-travel-x,
+  .animate-travel-y,
+  .animate-ping-soft,
   .animate-scan,
   .animate-float,
   .animate-blink,
   .animate-shimmer {
     animation: none;
+  }
+
+  .animate-arc {
+    animation: none;
+    stroke-dashoffset: 0;
+    opacity: 0.6;
   }
 }
