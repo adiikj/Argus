@@ -1,5 +1,10 @@
 import Link from 'next/link';
-import { ATTACK_STAGES, RULE_CATALOG, type AttackStage, type RuleInfo } from '@argus/contracts/rules';
+import {
+  ATTACK_STAGES,
+  RULE_CATALOG,
+  type AttackStage,
+  type RuleInfo,
+} from '@argus/contracts/rules';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { AttackTechnique } from '../_components/attack-technique';
@@ -25,7 +30,9 @@ function RuleCard({ rule }: { rule: RuleInfo }) {
           <Badge variant={rule.severity}>{rule.severity}</Badge>
         </div>
         <div className="flex flex-wrap items-center gap-2 text-xs text-text-secondary">
-          <span className="rounded bg-bg-elevated px-2 py-0.5 font-mono text-[11px]">{rule.id}</span>
+          <span className="rounded bg-bg-elevated px-2 py-0.5 font-mono text-[11px]">
+            {rule.id}
+          </span>
           <AttackTechnique ruleId={rule.id} link />
           <span>
             {rule.technique.name} · {rule.tactic.name}
@@ -40,7 +47,10 @@ function RuleCard({ rule }: { rule: RuleInfo }) {
           ))}
         </ul>
         {rule.scenario && (
-          <Link href="/simulator" className="inline-block font-mono text-xs text-accent hover:underline">
+          <Link
+            href="/simulator"
+            className="inline-block font-mono text-xs text-accent hover:underline"
+          >
             Try it: simulator → {rule.scenario}
           </Link>
         )}
@@ -56,7 +66,7 @@ export default function CoveragePage() {
   const tactics = new Set(RULES.map((r) => r.tactic.name));
 
   return (
-<main className="mx-auto max-w-[1400px] px-4 py-8 sm:px-6 lg:px-8">
+    <main className="mx-auto max-w-[1400px] px-4 py-8 sm:px-6 lg:px-8">
       <PageHeader
         title="Detection Coverage"
         description={`What Argus can detect, in MITRE ATT&CK terms — straight from the rule catalog the engine runs, so this page can't drift from reality.`}
@@ -75,7 +85,10 @@ export default function CoveragePage() {
       </div>
       <div className="mb-8 flex flex-wrap gap-2">
         {[...tactics].map((t) => (
-          <span key={t} className="rounded-full border border-border-strong bg-bg-panel px-3 py-1 text-[12px] text-text-secondary">
+          <span
+            key={t}
+            className="rounded-full border border-border-strong bg-bg-panel px-3 py-1 text-[12px] text-text-secondary"
+          >
             {t}
           </span>
         ))}
