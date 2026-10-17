@@ -1,0 +1,234 @@
+# Backend-only production stack for a small, shared VM. The dashboard runs on
+# Vercel; this file is api + generator + Kafka + Postgres + Redis, sized to
+# share ~4 GB with other apps (Argus budget ~1 GB). Images are built and
+# vulnerability-scanned in CI (.github/workflows/images.yml) — the VM only pulls.
+#
+#   cp .env.vm.example .env.vm        # fill in, then:
+#   docker compose -f docker-compose.vm.yml --env-file .env.vm pull
+#   docker compose -f docker-compose.vm.yml --env-file .env.vm up -d
+#
+# Nothing here is reachable from outside the VM: datastores publish no ports,
+# api/generator bind 127.0.0.1 only. A reverse proxy terminates TLS in front —
+# the bundled Caddy (`--profile caddy`) or the host's existing nginx
+# (deploy/nginx/argus.conf).
+#
+# mem_limits are hard caps (the kernel kills the container, not a neighbour
+# app). Typical steady-state use is well under the sum of the caps.
+name: argus
+
+x-logging: &logging
+  # docker's default json-file log grows forever — cap it on a small disk
+  driver: json-file
+  options:
+    max-size: 10m
+    max-file: '3'
+
+x-app-env: &app-env
+  NODE_ENV: production
+  LOG_LEVEL: ${LOG_LEVEL:-info}
+  KAFKA_BROKERS: kafka:19092
+  POSTGRES_URL: postgresql://argus:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env.vm}@postgres:5432/argus
+  AUTH_SECRET: ${AUTH_SECRET:?set AUTH_SECRET in .env.vm (openssl rand -hex 32)}
+  CORS_ORIGIN: ${CORS_ORIGIN:?set CORS_ORIGIN to the Vercel dashboard origin(s)}
+  # the proxy reaches the containers from a private Docker address — trusted;
+  # anything else (and anything forged in X-Forwarded-For) is not
+  TRUST_PROXY: ${TRUST_PROXY:-loopback,uniquelocal}
+
+services:
+  kafka:
+    image: apache/kafka:3.9.1
+    container_name: argus-kafka
+    restart: unless-stopped
+    logging: *logging
+    mem_limit: 600m
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      CLUSTER_ID: 5L6g3nShT-eMCtK--X86sw
+      KAFKA_LISTENERS: CONTROLLER://0.0.0.0:9093,INTERNAL://0.0.0.0:19092
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:19092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,INTERNAL:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'false'
+      KAFKA_LOG_RETENTION_HOURS: 24
+      KAFKA_LOG_ROLL_HOURS: 1
+      # the JVM default heap is 1 GB; a few events/sec needs a fraction of that
+      KAFKA_HEAP_OPTS: -Xms256m -Xmx256m
+    volumes:
+      - kafka_data:/var/lib/kafka/data
+    healthcheck:
+      # a plain TCP probe on purpose: kafka-broker-api-versions.sh boots a whole
+      # second JVM (with KAFKA_HEAP_OPTS' heap) every interval, inside this
+      # container's memory cap
+      test: ['CMD', 'bash', '-c', '</dev/tcp/localhost/19092']
+      interval: 15s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: argus-postgres
+    restart: unless-stopped
+    logging: *logging
+    mem_limit: 256m
+    # small-box tuning: Argus holds a handful of connections and a modest dataset
+    command:
+      - postgres
+      - -c
+      - shared_buffers=64MB
+      - -c
+      - effective_cache_size=160MB
+      - -c
+      - work_mem=4MB
+      - -c
+      - max_connections=40
+    environment:
+      POSTGRES_USER: argus
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env.vm}
+      POSTGRES_DB: argus
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U argus -d argus']
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+
+  # detection windows/baselines + the internal bus. Every Argus key has a TTL,
+  # so volatile-lru can always make room; no persistence — it's all derivable
+  # short-lived state, not worth the disk writes.
+  redis:
+    image: redis:7-alpine
+    container_name: argus-redis
+    restart: unless-stopped
+    logging: *logging
+    mem_limit: 96m
+    command:
+      [
+        'redis-server',
+        '--maxmemory',
+        '64mb',
+        '--maxmemory-policy',
+        'volatile-lru',
+        '--save',
+        '',
+        '--appendonly',
+        'no',
+      ]
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  # one-shot: applies pending Prisma migrations, then exits; api waits on it
+  migrate:
+    image: ${ARGUS_API_IMAGE:-ghcr.io/adiikj/argus-api:latest}
+    container_name: argus-migrate
+    restart: 'no'
+    logging: *logging
+    working_dir: /app/apps/api
+    command: ['./node_modules/.bin/prisma', 'migrate', 'deploy']
+    environment:
+      POSTGRES_URL: postgresql://argus:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env.vm}@postgres:5432/argus
+      CHECKPOINT_DISABLE: '1'
+    depends_on:
+      postgres: { condition: service_healthy }
+
+  api:
+    image: ${ARGUS_API_IMAGE:-ghcr.io/adiikj/argus-api:latest}
+    container_name: argus-api
+    restart: unless-stopped
+    logging: *logging
+    mem_limit: 320m
+    environment:
+      <<: *app-env
+      PORT: '4000'
+      NODE_OPTIONS: --max-old-space-size=192
+      STORAGE_PROFILE: lite # Postgres full-text search; no Elasticsearch on this box
+      REDIS_URL: redis://redis:6379
+      EVENT_RETENTION_DAYS: ${EVENT_RETENTION_DAYS:-7}
+      ALLOW_REGISTRATION: 'false' # accounts via the create-user CLI only
+      LLM_PROVIDER: ${LLM_PROVIDER:-none}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+      GEMINI_MODEL: ${GEMINI_MODEL:-}
+      GROQ_MODEL: ${GROQ_MODEL:-}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      SLACK_WEBHOOK_URL: ${SLACK_WEBHOOK_URL:-}
+      DASHBOARD_URL: ${DASHBOARD_URL:-}
+    ports:
+      - '127.0.0.1:${API_HOST_PORT:-4000}:4000'
+    healthcheck:
+      test: ['CMD-SHELL', 'wget -qO- http://127.0.0.1:4000/healthz >/dev/null || exit 1']
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    depends_on:
+      kafka: { condition: service_healthy }
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+      migrate: { condition: service_completed_successfully }
+
+  generator:
+    image: ${ARGUS_GENERATOR_IMAGE:-ghcr.io/adiikj/argus-generator:latest}
+    container_name: argus-generator
+    restart: unless-stopped
+    logging: *logging
+    mem_limit: 160m
+    environment:
+      <<: *app-env
+      GENERATOR_PORT: '4200'
+      NODE_OPTIONS: --max-old-space-size=96
+      # one benign event every 3s keeps the feed alive without filling the disk
+      NOISE_INTERVAL_MS: ${NOISE_INTERVAL_MS:-3000}
+      DEMO_MODE: ${DEMO_MODE:-false}
+    ports:
+      - '127.0.0.1:${GENERATOR_HOST_PORT:-4200}:4200'
+    healthcheck:
+      test: ['CMD-SHELL', 'wget -qO- http://127.0.0.1:4200/healthz >/dev/null || exit 1']
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    depends_on:
+      kafka: { condition: service_healthy }
+
+  # optional TLS-terminating proxy, for a VM with nothing on :80/:443 yet:
+  #   docker compose -f docker-compose.vm.yml --env-file .env.vm --profile caddy up -d
+  # Already running nginx for other apps? Skip this; use deploy/nginx/argus.conf.
+  caddy:
+    image: caddy:2-alpine
+    container_name: argus-caddy
+    profiles: [caddy]
+    restart: unless-stopped
+    logging: *logging
+    mem_limit: 96m
+    ports:
+      - '80:80'
+      - '443:443'
+    environment:
+      API_HOST: ${API_HOST:?set API_HOST (e.g. argus-api.example.com)}
+      ACME_EMAIL: ${ACME_EMAIL:?set ACME_EMAIL for Let's Encrypt}
+    volumes:
+      - ./deploy/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - api
+      - generator
+
+volumes:
+  kafka_data:
+  pg_data:
+  caddy_data:
+  caddy_config:
