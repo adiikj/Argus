@@ -11,6 +11,7 @@ export interface Metrics {
   parseFailures: number;
   eventsIndexed: number;
   alertsRaised: number;
+  alertsSuppressed?: number; // held back by the api's alert throttle
   incidentsOpened: number;
   incidentsUpdated: number;
   summariesGenerated: number;

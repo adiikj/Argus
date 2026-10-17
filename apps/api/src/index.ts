@@ -106,7 +106,9 @@ async function startDetection(
   m: Metrics,
 ): Promise<void> {
   const seenEventIds = new SeenEventIds(5 * 60 * 1000);
-  const ruleEngine = createRuleEngine(RULES, windowStore, baselineStore);
+  const ruleEngine = createRuleEngine(RULES, windowStore, baselineStore, {
+    onSuppressed: () => m.incr('alertsSuppressed'),
+  });
   await subscribe(kafka, 'api-detection', TOPICS.EVENTS_NORMALIZED, async (value) => {
     const event = NormalizedEvent.parse(value);
     if (seenEventIds.hasSeen(event.eventId)) return; // at-least-once redelivery guard, §4
