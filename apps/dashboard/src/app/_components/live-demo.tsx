@@ -69,7 +69,7 @@ const STAGES: Array<{ id: AttackStage; label: string }> = [
 ];
 
 const SUMMARY =
-  'A single source ran a full campaign: tool-driven recon for exposed secrets, injection probes against the API, then password spraying that narrowed to the deploy account and ended in a successful login (T1078). Treat deploy as compromised — kill its sessions, rotate credentials, and block 45.148.10.12 at the edge.';
+  'One source ran a full campaign. It scanned for exposed secrets with a known tool, probed the API with injection payloads, then sprayed passwords until the deploy account logged in (T1078). Treat deploy as compromised: end its sessions, rotate its credentials and block 45.148.10.12 at the edge.';
 
 const DOT: Record<Severity, string> = {
   critical: 'bg-severity-critical',
@@ -144,24 +144,19 @@ export function LiveDemo() {
 
   return (
     <div className="relative">
-      <div
-        aria-hidden
-        className="animate-glow absolute -inset-x-10 -top-10 -bottom-4 -z-10 rounded-[3rem] bg-[radial-gradient(50%_60%_at_50%_0%,color-mix(in_srgb,var(--color-accent)_45%,transparent),transparent_70%)] blur-2xl"
-      />
-
-      <div className="border-gradient relative overflow-hidden rounded-2xl bg-bg-panel shadow-[0_40px_120px_-30px_rgb(0_0_0/0.9)]">
+      <div className="relative overflow-hidden rounded-[var(--radius-panel)] border border-border-strong bg-bg-panel">
         {/* window chrome */}
         <div className="flex items-center justify-between border-b border-border-subtle bg-bg-elevated/70 px-4 py-3">
           <div className="flex items-center gap-1.5">
-            <span className="h-2.5 w-2.5 rounded-full bg-white/10" />
-            <span className="h-2.5 w-2.5 rounded-full bg-white/10" />
-            <span className="h-2.5 w-2.5 rounded-full bg-white/10" />
+            <span className="font-mono text-[10.5px] tracking-[0.14em] text-text-muted uppercase">
+              Console preview
+            </span>
           </div>
           <div className="rounded-md border border-border-subtle bg-bg-base/70 px-3 py-1 font-mono text-[11px] text-text-muted">
             argus.buzz/alerts
           </div>
           <div className="flex items-center gap-1.5 font-mono text-[11px] text-severity-ok">
-            <span className="h-1.5 w-1.5 rounded-full bg-severity-ok shadow-[0_0_8px_var(--color-severity-ok)]" />
+            <span className="h-1.5 w-1.5 rounded-full bg-severity-ok" />
             live
           </div>
         </div>
@@ -243,7 +238,7 @@ export function LiveDemo() {
 
             <div className="flex-1 rounded-lg border border-border-subtle bg-bg-base/60 p-4">
               <div className="mb-2 flex items-center gap-2 font-mono text-[10px] uppercase tracking-wider text-accent">
-                <span className="text-gradient font-semibold">AI summary</span>
+                <span className="font-semibold">AI summary</span>
                 {compromised && typed < SUMMARY.length && <span className="animate-blink">▍</span>}
               </div>
               <p className="text-[12.5px] leading-relaxed text-text-secondary">

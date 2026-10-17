@@ -164,63 +164,21 @@ export default function LoginPage() {
   };
 
   return (
-    <main className="grid min-h-screen bg-bg-base lg:grid-cols-2">
-      {/* brand panel */}
-      <aside className="relative hidden overflow-hidden border-r border-border-subtle lg:flex lg:flex-col lg:justify-between lg:p-12">
-        <div
-          aria-hidden
-          className="bg-grid mask-radial pointer-events-none absolute inset-0 opacity-70"
-        />
-        <div
-          aria-hidden
-          className="pointer-events-none absolute -top-40 -left-40 h-[520px] w-[520px] rounded-full bg-[radial-gradient(closest-side,color-mix(in_srgb,var(--color-accent)_22%,transparent),transparent)]"
-        />
-        <div
-          aria-hidden
-          className="pointer-events-none absolute -right-40 -bottom-40 h-[520px] w-[520px] rounded-full bg-[radial-gradient(closest-side,color-mix(in_srgb,var(--color-accent-2)_18%,transparent),transparent)]"
-        />
-        <div className="relative">
-          <Wordmark />
-        </div>
-        <div className="relative max-w-md">
-          <h2 className="text-[34px] font-semibold leading-[1.1] tracking-[-0.03em]">
-            The hundred-eyed watchman,{' '}
-            <span className="text-gradient">on duty around the clock.</span>
-          </h2>
-          <ul className="mt-8 space-y-3 text-[14px] text-text-secondary">
-            {[
-              'Live detections mapped to MITRE ATT&CK',
-              'Incidents correlated, enriched and explained by AI',
-              'Real scanner traffic from the public internet',
-            ].map((line) => (
-              <li key={line} className="flex items-center gap-3">
-                <span className="bg-brand h-1.5 w-1.5 rounded-full" />
-                {line}
-              </li>
-            ))}
-          </ul>
-        </div>
-        <p className="relative font-mono text-[11px] text-text-muted">
-          Read-only demo available — no account needed.
-        </p>
-      </aside>
-
-      <div className="relative flex items-center justify-center px-4 py-12">
+    <main className="bg-grid min-h-screen bg-bg-base">
+      <div className="relative flex min-h-screen items-center justify-center px-4 py-12">
         <div className="relative w-full max-w-sm">
-          <div className="mb-8 flex justify-center lg:hidden">
+          <div className="mb-8 flex justify-center">
             <Wordmark />
           </div>
 
-          <h1 className="mb-1 text-[22px] font-semibold tracking-tight">
+          <h1 className="mb-1 text-center text-[22px] font-semibold tracking-[-0.01em]">
             {mode === 'login' ? 'Sign in to Argus' : 'Create your account'}
           </h1>
-          <p className="mb-6 text-sm text-text-secondary">
-            {mode === 'login'
-              ? 'Welcome back — the console is live.'
-              : 'Get access to the live console.'}
+          <p className="mb-6 text-center text-sm text-text-secondary">
+            {mode === 'login' ? 'Welcome back.' : 'Create an account for the console.'}
           </p>
 
-          <div className="surface rounded-2xl border border-border-subtle p-6">
+          <div className="rounded-[var(--radius-panel)] border border-border-subtle bg-bg-panel p-6">
             {registrationOpen && (
               <div className="mb-6 flex items-center gap-1 rounded-lg border border-border-subtle bg-bg-base p-1">
                 {(['login', 'register'] as const).map((m) => (
@@ -311,7 +269,7 @@ export default function LoginPage() {
               <>
                 <div className="my-5 flex items-center gap-3 font-mono text-[10px] uppercase tracking-wider text-text-secondary">
                   <span className="h-px flex-1 bg-border-subtle" />
-                  just looking?
+                  or
                   <span className="h-px flex-1 bg-border-subtle" />
                 </div>
                 <Button
@@ -327,7 +285,7 @@ export default function LoginPage() {
                   Explore the live demo
                 </Button>
                 <p className="mt-2 text-center font-mono text-[10px] text-text-secondary">
-                  read-only account — fire attacks from the simulator, watch them land
+                  Read-only. You can fire attacks from the simulator.
                 </p>
               </>
             )}
