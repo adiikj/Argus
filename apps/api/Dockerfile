@@ -1,5 +1,5 @@
 # Build from the repo root: docker build -f apps/api/Dockerfile .
-FROM node:24-alpine AS base
+FROM node:25-alpine AS base
 # Prisma's engines link against OpenSSL — Alpine doesn't ship it by default.
 RUN apk add --no-cache openssl
 RUN corepack enable
