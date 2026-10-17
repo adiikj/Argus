@@ -1,0 +1,16 @@
+# /etc/logrotate.d/argus — installed by `./deploy/vm.sh probes`. Mirrors
+# Ubuntu's stock nginx policy: rotate by renaming + reopening (not
+# copytruncate), so the generator's tail drains the old file and switches over.
+/var/log/nginx/argus/*.log {
+    daily
+    rotate 7
+    missingok
+    notifempty
+    compress
+    delaycompress
+    create 0640 www-data adm
+    sharedscripts
+    postrotate
+        invoke-rc.d nginx rotate >/dev/null 2>&1 || true
+    endscript
+}

@@ -5,6 +5,7 @@
 #   ./deploy/vm.sh init               create .env.vm with freshly generated secrets
 #   ./deploy/vm.sh preflight          check the box + .env.vm before deploying
 #   ./deploy/vm.sh nginx              print the nginx site for API_HOST (pipe to sudo tee)
+#   ./deploy/vm.sh probes             install probe logging (real attack traffic) into nginx
 #   ./deploy/vm.sh up                 pull images, migrate, start, wait for healthy
 #   ./deploy/vm.sh status             containers + live memory use vs. caps
 #   ./deploy/vm.sh logs [service]     follow logs (default: api)
@@ -206,6 +207,13 @@ cmd_preflight() {
     fi
   fi
 
+  echo "Real attack traffic"
+  if [[ -f /etc/nginx/conf.d/argus-logging.conf && -d /var/log/nginx/argus ]]; then
+    ok "nginx probe logging installed"
+  else
+    warn "nginx probe logging not installed — ./deploy/vm.sh probes (optional: ships real scanner traffic into Argus)"
+  fi
+
   echo
   if ((FAILS > 0)); then die "$FAILS check(s) failed"; fi
   ok "preflight passed"
@@ -222,6 +230,65 @@ cmd_nginx() {
     -e "s/127\.0\.0\.1:4000/127.0.0.1:${api_port:-4000}/" \
     -e "s/127\.0\.0\.1:4200/127.0.0.1:${gen_port:-4200}/" \
     deploy/nginx/argus.conf
+}
+
+# Installs the nginx side of real-traffic ingestion: the probe-detection map +
+# a token-free log format (conf.d), the site's access_log lines (snippets), a
+# logrotate policy, and one include line in the live site file. Idempotent;
+# backs the site file up, validates with nginx -t, and rolls every change back
+# if validation fails — so the other sites on this nginx can't be broken.
+cmd_probes() {
+  local sudo=''
+  [[ $(id -u) == 0 ]] || sudo=sudo
+  local site=${NGINX_SITE:-/etc/nginx/sites-enabled/argus.conf}
+  local conf=/etc/nginx/conf.d/argus-logging.conf
+  local snippet=/etc/nginx/snippets/argus-access-log.conf
+  local include_line='include /etc/nginx/snippets/argus-access-log.conf;'
+  command -v nginx >/dev/null 2>&1 || die "nginx not found"
+
+  local had_conf=false had_snippet=false backup=''
+  [[ -f $conf ]] && had_conf=true
+  [[ -f $snippet ]] && had_snippet=true
+
+  $sudo install -d -m 750 -o root -g adm /var/log/nginx/argus
+  $sudo install -d -m 755 /etc/nginx/snippets
+  $sudo install -m 644 deploy/nginx/argus-logging.conf "$conf"
+  $sudo install -m 644 deploy/nginx/argus-access-log.conf "$snippet"
+  ok "installed $conf and $snippet"
+
+  if [[ -e $site ]]; then
+    local real
+    real=$(readlink -f "$site")
+    if grep -qF "$include_line" "$real"; then
+      ok "$real already includes the snippet"
+    else
+      grep -q 'server_tokens off;' "$real" || die "no 'server_tokens off;' line in $real to anchor on — add '$include_line' to its HTTPS server block by hand"
+      backup="$real.bak-$(date +%Y%m%d%H%M%S)"
+      $sudo cp -p "$real" "$backup"
+      # first match only: the original (certbot-extended, HTTPS) server block;
+      # certbot's appended port-80 redirect block has no server_tokens line
+      $sudo sed -i "0,/server_tokens off;/s||server_tokens off;\n    $include_line|" "$real"
+      ok "added the include to $real (backup: $backup)"
+    fi
+  else
+    warn "$site not found — install the site first (./deploy/vm.sh nginx), then re-run this"
+  fi
+
+  if ! $sudo nginx -t >/dev/null 2>&1; then
+    $sudo nginx -t || true
+    [[ -n $backup ]] && $sudo cp -p "$backup" "$(readlink -f "$site")"
+    $had_conf || $sudo rm -f "$conf"
+    $had_snippet || $sudo rm -f "$snippet"
+    die "nginx -t failed — every change rolled back, nothing reloaded"
+  fi
+  $sudo systemctl reload nginx
+  ok "nginx validated and reloaded"
+
+  $sudo install -m 644 deploy/nginx/argus.logrotate /etc/logrotate.d/argus
+  if $sudo logrotate -d /etc/logrotate.d/argus >/dev/null 2>&1; then ok "logrotate policy installed"; else warn "logrotate -d complained about /etc/logrotate.d/argus"; fi
+
+  echo
+  ok "probe logging live — restart the generator to start shipping: ./deploy/vm.sh up"
 }
 
 wait_healthy() {
@@ -348,6 +415,7 @@ case ${1:-} in
   init) cmd_init ;;
   preflight) cmd_preflight ;;
   nginx) cmd_nginx ;;
+  probes) cmd_probes ;;
   up | update) cmd_up ;;
   status) cmd_status ;;
   logs) need_env_file && "${COMPOSE[@]}" logs -f --tail 200 "${2:-api}" ;;
@@ -356,5 +424,5 @@ case ${1:-} in
   rollback) shift && cmd_rollback "$@" ;;
   verify) cmd_verify ;;
   down) need_env_file && "${COMPOSE[@]}" down ;;
-  *) sed -n '2,16p' "$0" | sed 's/^# \{0,1\}//' && exit 1 ;;
+  *) awk 'NR > 1 && /^#/ { sub(/^# ?/, ""); print; next } NR > 1 { exit }' "$0" && exit 1 ;;
 esac

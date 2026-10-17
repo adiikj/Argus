@@ -155,6 +155,14 @@ services:
       # one benign event every 3s keeps the feed alive without filling the disk
       NOISE_INTERVAL_MS: ${NOISE_INTERVAL_MS:-3000}
       DEMO_MODE: ${DEMO_MODE:-false}
+      # real attack traffic: nginx's probe log for API_HOST (deploy/nginx/,
+      # `./deploy/vm.sh probes`), tailed into the pipeline next to the demo traffic
+      SHIP_NGINX_LOG: /var/log/argus-nginx/probes.log
+    # gid 4 = adm on Debian/Ubuntu: lets the non-root node user read nginx's
+    # 0640 www-data:adm log files — read-only, and only Argus's own log dir
+    group_add: ['4']
+    volumes:
+      - ${PROBE_LOG_DIR:-/var/log/nginx/argus}:/var/log/argus-nginx:ro
     ports:
       - '127.0.0.1:${GENERATOR_HOST_PORT:-4200}:4200'
     healthcheck:
