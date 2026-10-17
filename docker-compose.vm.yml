@@ -16,8 +16,7 @@
 # app). Typical steady-state use is well under the sum of the caps.
 name: argus
 
-x-logging: &logging
-  # docker's default json-file log grows forever — cap it on a small disk
+x-logging: &logging # docker's default json-file log grows forever — cap it on a small disk
   driver: json-file
   options:
     max-size: 10m
