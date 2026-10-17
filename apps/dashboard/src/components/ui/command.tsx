@@ -37,10 +37,10 @@ function CommandInput({
   ...props
 }: React.ComponentProps<typeof CommandPrimitive.Input>) {
   return (
-    <div className="flex items-center border-b border-border-subtle px-3">
+    <div className="flex items-center border-b border-border-subtle px-4">
       <CommandPrimitive.Input
         className={cn(
-          'flex h-11 w-full bg-transparent py-3 text-sm text-text-primary placeholder:text-text-secondary focus:outline-none',
+          'flex h-13 w-full bg-transparent py-4 text-[15px] text-text-primary placeholder:text-text-muted focus:outline-none',
           className,
         )}
         {...props}
@@ -71,7 +71,7 @@ function CommandGroup({
   return (
     <CommandPrimitive.Group
       className={cn(
-        'overflow-hidden p-1 text-text-secondary [&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:py-1.5 [&_[cmdk-group-heading]]:font-mono [&_[cmdk-group-heading]]:text-[10px] [&_[cmdk-group-heading]]:uppercase [&_[cmdk-group-heading]]:tracking-wider [&_[cmdk-group-heading]]:text-text-secondary',
+        'overflow-hidden p-1 text-text-secondary [&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:py-1.5 [&_[cmdk-group-heading]]:font-mono [&_[cmdk-group-heading]]:text-[10px] [&_[cmdk-group-heading]]:uppercase [&_[cmdk-group-heading]]:tracking-[0.14em] [&_[cmdk-group-heading]]:text-text-muted',
         className,
       )}
       {...props}
@@ -83,7 +83,7 @@ function CommandItem({ className, ...props }: React.ComponentProps<typeof Comman
   return (
     <CommandPrimitive.Item
       className={cn(
-        'flex cursor-pointer items-center gap-2.5 rounded-md px-2.5 py-2 text-sm text-text-primary outline-none data-[selected=true]:bg-accent/10 data-[selected=true]:text-text-primary',
+        'flex cursor-pointer items-center gap-3 rounded-lg px-3 py-2.5 text-[13.5px] text-text-secondary outline-none transition-colors data-[selected=true]:bg-bg-elevated data-[selected=true]:text-text-primary data-[selected=true]:[&_svg]:text-accent',
         className,
       )}
       {...props}
