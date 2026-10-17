@@ -23,8 +23,11 @@ prisma/*.db
 npm-debug.log*
 pnpm-debug.log*
 
-# Coverage / test
-coverage/
+# Coverage / test — test-coverage output only; a bare "coverage/" also
+# matched the dashboard's /coverage route (src/app/(app)/coverage)
+/coverage/
+/apps/*/coverage/
+/packages/*/coverage/
 .nyc_output/
 
 # Editor / OS
