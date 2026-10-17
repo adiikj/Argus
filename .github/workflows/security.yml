@@ -74,8 +74,8 @@ jobs:
           sarif_file: trivy.sarif
           category: trivy
 
-      # fail on anything critical that has a fix available. Accepted risks live
-      # in .trivyignore, each with a reason and an expiry date.
+      # fail on anything critical that has a fix available. Accepted risks go in
+      # a .trivyignore, each with a reason and an expiry date.
       - name: Gate on fixable critical vulnerabilities
         run: ./trivy fs . --scanners vuln --severity CRITICAL --ignore-unfixed --exit-code 1
 

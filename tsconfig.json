@@ -1,6 +1,0 @@
-{
-  "//": "Root config for editor tooling. Each package/app has its own tsconfig that extends tsconfig.base.json.",
-  "extends": "./tsconfig.base.json",
-  "include": [],
-  "files": []
-}

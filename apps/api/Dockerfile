@@ -22,7 +22,7 @@ RUN pnpm turbo run build --filter=@argus/api
 # a second, --prod-only install so the runner never inherits devDependencies
 # (tsc, turbo) that the installer stage needed to build. The prisma CLI is a
 # real dependency on purpose: the same image runs `prisma migrate deploy` as
-# the one-shot `migrate` service in docker-compose.prod.yml.
+# the one-shot `migrate` service in deploy/docker-compose.vm.yml.
 FROM base AS prod-deps
 WORKDIR /app
 COPY --from=pruner /app/out/json/ .

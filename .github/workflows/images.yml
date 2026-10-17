@@ -13,7 +13,6 @@ on:
       - package.json
       - pnpm-lock.yaml
       - tsconfig.base.json
-      - .trivyignore
       - .github/workflows/images.yml
   # monthly: DB-IP publishes a new GeoIP database at the start of each month
   schedule:
