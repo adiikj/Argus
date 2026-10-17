@@ -216,8 +216,10 @@ services:
       - '80:80'
       - '443:443'
     environment:
-      API_HOST: ${API_HOST:?set API_HOST (e.g. argus-api.example.com)}
-      ACME_EMAIL: ${ACME_EMAIL:?set ACME_EMAIL for Let's Encrypt}
+      # not `:?`-required: compose can validate these even when the caddy
+      # profile is off, which would break the nginx setup. Set both to use Caddy.
+      API_HOST: ${API_HOST:-}
+      ACME_EMAIL: ${ACME_EMAIL:-}
     volumes:
       - ./deploy/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
