@@ -38,7 +38,7 @@ export function KillChain({ alerts }: { alerts: Alert[] }) {
   }
 
   return (
-    <Card className="mb-6">
+    <Card>
       <CardHeader>
         <CardTitle>Attack progression</CardTitle>
       </CardHeader>

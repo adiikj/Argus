@@ -2,7 +2,7 @@
 
 import { motion, AnimatePresence } from 'framer-motion';
 import { useRealtime, type PipelineStage } from '@/lib/realtime';
-import { Card } from '@/components/ui/card';
+import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 
 const STAGE_COLOR: Record<PipelineStage, string> = {
@@ -21,14 +21,19 @@ export function SystemActivity() {
 
   return (
     <Card className="overflow-hidden">
-      <div className="border-b border-border-subtle px-4 py-2">
-        <span className="font-mono text-[10px] uppercase tracking-wider text-text-secondary">
-          System activity
+      <CardHeader className="flex-row items-center justify-between border-b border-border-subtle pb-3">
+        <div>
+          <CardTitle>System activity</CardTitle>
+          <CardDescription>Stage-by-stage events for attacking sources</CardDescription>
+        </div>
+        <span className="relative flex h-2 w-2">
+          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-accent opacity-50" />
+          <span className="relative inline-flex h-2 w-2 rounded-full bg-accent" />
         </span>
-      </div>
-      <div className="max-h-64 overflow-y-auto p-3 font-mono text-xs">
+      </CardHeader>
+      <div className="max-h-64 overflow-y-auto px-5 py-3 font-mono text-[11.5px]">
         {pipelineActivity.length === 0 ? (
-          <p className="py-8 text-center text-text-secondary">Waiting for pipeline activity…</p>
+          <p className="py-8 text-center text-text-muted">Waiting for pipeline activity…</p>
         ) : (
           <ul className="flex flex-col gap-1">
             <AnimatePresence initial={false}>

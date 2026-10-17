@@ -58,12 +58,25 @@ export function PipelineFlow() {
   }, [pipelineActivity]);
 
   return (
-    <Card className="overflow-x-auto p-6">
-      <div className="flex min-w-[640px] items-center justify-between">
+    <Card className="overflow-x-auto">
+      <div className="flex items-center justify-between px-5 pt-4">
+        <span className="text-[13px] font-medium tracking-tight">Live pipeline</span>
+        <span className="font-mono text-[10.5px] text-text-muted">
+          raw log → explained incident
+        </span>
+      </div>
+      <div className="flex min-w-[640px] items-center justify-between px-5 pt-5 pb-5">
         {NODES.map((node, i) => (
           <div key={node.key} className="flex flex-1 items-center">
             <Node label={node.label} Icon={node.icon} pulseCount={pulses[node.key] ?? 0} />
-            {i < NODES.length - 1 && <div className="mx-1 h-px flex-1 bg-border-subtle sm:mx-2" />}
+            {i < NODES.length - 1 && (
+              <div className="relative mx-1 mb-6 h-px flex-1 overflow-hidden bg-border-strong sm:mx-2">
+                <div
+                  className="animate-beam absolute inset-y-0 w-1/3 bg-[linear-gradient(90deg,transparent,var(--color-accent),transparent)]"
+                  style={{ animationDelay: `${i * 0.35}s` }}
+                />
+              </div>
+            )}
           </div>
         ))}
       </div>
@@ -98,12 +111,12 @@ function Node({
         }
         transition={{ duration: 0.55, ease: 'easeOut' }}
         className={cn(
-          'flex h-11 w-11 shrink-0 items-center justify-center rounded-full border bg-bg-elevated text-accent',
+          'flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-border-strong bg-bg-elevated text-accent shadow-[inset_0_1px_0_rgb(255_255_255/0.05)]',
         )}
       >
         <Icon className="h-4 w-4" strokeWidth={1.8} />
       </motion.span>
-      <span className="whitespace-nowrap font-mono text-[9px] uppercase tracking-wider text-text-secondary">
+      <span className="whitespace-nowrap font-mono text-[9.5px] uppercase tracking-wider text-text-muted">
         {label}
       </span>
     </div>

@@ -8,6 +8,7 @@ import { useEvents } from '@/lib/use-events';
 import { Card } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
+import { PageHeader } from '../_components/page-header';
 
 const SOURCES = ['auth', 'nginx', 'api-gateway'] as const;
 
@@ -94,18 +95,18 @@ export default function LogsPage() {
   };
 
   return (
-    <main className="mx-auto max-w-5xl px-6 py-8">
-      <h1 className="mb-2 text-lg font-semibold text-text-primary">Log Explorer</h1>
-      <p className="mb-6 text-sm text-text-secondary">
-        Search the normalized event stream. Click a row to trace it through the pipeline.
-      </p>
+    <main className="mx-auto max-w-[1400px] px-4 py-8 sm:px-6 lg:px-8">
+      <PageHeader
+        title="Log Explorer"
+        description="Full-text search over the normalized event stream. Open any event to trace it through the pipeline — parse, detection, incident."
+      />
 
       <div className="mb-4 flex gap-2">
         <input
           value={q}
           onChange={(e) => setQ(e.target.value)}
           placeholder="search raw text, ip, path, user agent…"
-          className="flex-1 rounded-md border border-border-subtle bg-bg-panel px-3 py-1.5 text-sm text-text-primary placeholder:text-text-secondary focus:border-accent/50 focus:outline-none"
+          className="h-9 flex-1 rounded-lg border border-border-subtle bg-bg-panel px-3 text-sm text-text-primary placeholder:text-text-muted focus:border-accent/50 focus:outline-none"
         />
         <select
           value={source}
@@ -202,7 +203,7 @@ export default function LogsPage() {
                     <button
                       type="button"
                       onClick={() => toggle(event.eventId)}
-                      className="flex flex-1 items-center gap-3 rounded px-2 py-1.5 text-left"
+                      className="flex min-w-0 flex-1 items-center gap-3 rounded px-2 py-1.5 text-left"
                     >
                       <ChevronRight
                         className={cn(
@@ -216,7 +217,7 @@ export default function LogsPage() {
                       <span className="shrink-0 font-mono text-xs text-text-secondary">
                         {event.sourceIp}
                       </span>
-                      <span className="flex-1 truncate font-mono text-xs text-text-primary">
+                      <span className="min-w-0 flex-1 truncate font-mono text-xs text-text-primary">
                         {event.raw}
                       </span>
                       <span className="shrink-0 font-mono text-xs text-text-secondary tabular-nums">

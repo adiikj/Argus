@@ -9,9 +9,10 @@ import { useIncidentDetail } from '@/lib/use-incident-detail';
 import { usePatchIncident } from '@/lib/use-incident-mutation';
 import { useUsers } from '@/lib/use-users';
 import { useSessionRole } from '@/lib/use-session-role';
+import { useRealtime } from '@/lib/realtime';
+import { ruleInfo } from '@argus/contracts/rules';
 import { Badge, type BadgeProps } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Separator } from '@/components/ui/separator';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { KillChain } from '../../_components/kill-chain';
@@ -233,7 +234,7 @@ function ThreatIntelCard({ reputation }: { reputation: IpReputation }) {
           </div>
           {reputation.isTor && <Badge variant="high">tor exit</Badge>}
         </div>
-        <dl className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+        <dl className="grid grid-cols-2 gap-x-4 gap-y-3">
           <Fact
             label="Reports"
             value={`${reputation.totalReports} from ${reputation.distinctReporters} source${reputation.distinctReporters === 1 ? '' : 's'}`}
@@ -258,6 +259,7 @@ function ThreatIntelCard({ reputation }: { reputation: IpReputation }) {
 export function IncidentDetailClient({ id }: { id: string }) {
   const { data, isLoading, isError } = useIncidentDetail(id);
   const role = useSessionRole();
+  const { incidents: liveRows } = useRealtime();
 
   if (isLoading) {
     return <div className="px-6 py-8 text-sm text-text-secondary">Loading incident…</div>;
@@ -278,135 +280,193 @@ export function IncidentDetailClient({ id }: { id: string }) {
   }
 
   const { incident, alerts, summary, reputation } = data;
+  const geo = liveRows.find((r) => r.incident.incidentId === incident.incidentId)?.geo;
 
   return (
-    <main className="mx-auto max-w-3xl px-6 py-8">
+    <main className="mx-auto max-w-[1400px] px-4 py-8 sm:px-6 lg:px-8">
       <Link
-        href="/alerts"
-        className="mb-6 inline-flex items-center gap-1.5 text-xs text-text-secondary hover:text-text-primary"
+        href="/incidents"
+        className="mb-5 inline-flex items-center gap-1.5 text-[12.5px] text-text-secondary hover:text-text-primary"
       >
         <ArrowLeft className="h-3.5 w-3.5" />
-        back to alerts
+        Incidents
       </Link>
 
-      <motion.div className="mb-6" {...fadeIn(0)}>
-        <div className="mb-2 flex items-center gap-2">
-          <Badge variant={incident.severity}>{incident.severity}</Badge>
-          <Badge variant={STATUS_VARIANT[incident.status]}>{incident.status}</Badge>
-        </div>
-        <h1 className="font-mono text-lg font-semibold text-text-primary">
-          {incident.correlationKey}
-        </h1>
-        <p className="mt-1 text-xs text-text-secondary">
-          opened {formatDateTime(incident.createdAt)} · updated {formatDateTime(incident.updatedAt)}
-        </p>
-      </motion.div>
-
-      <motion.div {...fadeIn(0.08)}>
-        {role === 'viewer' ? (
-          <ReadOnlyActions incident={incident} />
-        ) : (
-          <IncidentActions incident={incident} />
-        )}
-      </motion.div>
-
-      <motion.div {...fadeIn(0.16)}>
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle>AI summary</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {summary ? (
-              <div className="space-y-4">
-                <div className="flex items-start gap-2">
-                  <Badge className="mt-0.5 shrink-0">{summary.generatedBy}</Badge>
-                  <p className="text-sm leading-relaxed text-text-primary">{summary.summary}</p>
-                </div>
-                {summary.iocs.length > 0 && (
-                  <div>
-                    <p className="mb-1.5 font-mono text-[10px] uppercase tracking-wider text-text-secondary">
-                      Indicators
-                    </p>
-                    <div className="flex flex-wrap gap-1.5">
-                      {summary.iocs.map((ioc) => (
-                        <span
-                          key={ioc}
-                          className="rounded bg-bg-elevated px-2 py-0.5 font-mono text-xs text-text-primary"
-                        >
-                          {ioc}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                {summary.recommendedActions.length > 0 && (
-                  <div>
-                    <p className="mb-1.5 font-mono text-[10px] uppercase tracking-wider text-text-secondary">
-                      Recommended actions
-                    </p>
-                    <ul className="list-inside list-disc space-y-1 text-sm text-text-secondary">
-                      {summary.recommendedActions.map((action) => (
-                        <li key={action}>{action}</li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
+      <motion.div {...fadeIn(0)}>
+        <Card className="relative mb-5 overflow-hidden">
+          <div
+            aria-hidden
+            className="pointer-events-none absolute inset-y-0 left-0 w-1"
+            style={{ background: `var(--color-severity-${incident.severity})` }}
+          />
+          <div className="flex flex-wrap items-start justify-between gap-6 px-6 py-5">
+            <div className="min-w-0">
+              <div className="mb-2 flex flex-wrap items-center gap-2">
+                <Badge variant={incident.severity}>{incident.severity}</Badge>
+                <Badge variant={STATUS_VARIANT[incident.status]}>
+                  {incident.status.replace('_', ' ')}
+                </Badge>
               </div>
-            ) : (
-              <p className="text-sm text-text-secondary">
-                No summary yet — one generates shortly after the incident settles.
+              <h1 className="font-mono text-[26px] font-semibold tracking-tight text-text-primary">
+                {incident.correlationKey}
+              </h1>
+              <p className="mt-1 text-[12.5px] text-text-muted">
+                {geo
+                  ? `${geo.countryName}${geo.source === 'simulated' ? ' (simulated location)' : ''} · `
+                  : ''}
+                incident {incident.incidentId.slice(0, 8)}
               </p>
-            )}
-          </CardContent>
-        </Card>
-      </motion.div>
-
-      {reputation && (
-        <motion.div {...fadeIn(0.2)}>
-          <ThreatIntelCard reputation={reputation} />
-        </motion.div>
-      )}
-
-      <motion.div {...fadeIn(0.22)}>
-        <KillChain alerts={alerts} />
-      </motion.div>
-
-      <motion.div {...fadeIn(0.28)}>
-        <Card>
-          <CardHeader>
-            <CardTitle>
-              Timeline · {alerts.length} alert{alerts.length === 1 ? '' : 's'}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-0">
-            <ul>
-              {alerts.map((alert, i) => (
-                <li key={alert.alertId}>
-                  {i > 0 && <Separator />}
-                  <div className="flex items-center gap-3 px-4 py-3">
-                    <Badge variant={alert.severity}>{alert.severity}</Badge>
-                    <span className="shrink-0 rounded bg-bg-elevated px-2 py-0.5 font-mono text-[11px] text-text-secondary">
-                      {alert.ruleId}
-                    </span>
-                    <AttackTechnique ruleId={alert.ruleId} link />
-                    <span className="flex-1 truncate text-sm text-text-primary">
-                      {alert.message}
-                    </span>
-                    {alert.count !== undefined && (
-                      <span className="shrink-0 font-mono text-xs text-text-secondary">
-                        ×{alert.count}
-                      </span>
-                    )}
-                    <span className="shrink-0 font-mono text-xs text-text-secondary tabular-nums">
-                      {formatDateTime(alert.timestamp)}
-                    </span>
-                  </div>
-                </li>
+            </div>
+            <dl className="grid grid-cols-2 gap-x-8 gap-y-3 sm:grid-cols-4">
+              {[
+                ['Alerts', String(alerts.length)],
+                ['Events', String(incident.eventIds.length)],
+                ['Opened', formatDateTime(incident.createdAt)],
+                ['Updated', formatDateTime(incident.updatedAt)],
+              ].map(([label, value]) => (
+                <div key={label}>
+                  <dt className="font-mono text-[10px] uppercase tracking-[0.12em] text-text-muted">
+                    {label}
+                  </dt>
+                  <dd className="mt-0.5 font-mono text-[13px] tabular-nums text-text-primary">
+                    {value}
+                  </dd>
+                </div>
               ))}
-            </ul>
-          </CardContent>
+            </dl>
+          </div>
         </Card>
       </motion.div>
+
+      <div className="grid items-start gap-5 lg:grid-cols-3">
+        <div className="space-y-5 lg:col-span-2">
+          <motion.div {...fadeIn(0.06)}>
+            <Card className="border-gradient">
+              <CardHeader className="flex-row items-center justify-between">
+                <CardTitle className="flex items-center gap-2">
+                  <span className="text-gradient font-semibold">AI summary</span>
+                </CardTitle>
+                {summary && (
+                  <span className="font-mono text-[10.5px] uppercase text-text-muted">
+                    {summary.generatedBy === 'llm' ? 'llm' : 'template'} ·{' '}
+                    {formatDateTime(summary.generatedAt)}
+                  </span>
+                )}
+              </CardHeader>
+              <CardContent>
+                {summary ? (
+                  <div className="space-y-5">
+                    <p className="text-[14.5px] leading-relaxed text-text-primary">
+                      {summary.summary}
+                    </p>
+                    {summary.recommendedActions.length > 0 && (
+                      <div>
+                        <p className="mb-2 font-mono text-[10px] uppercase tracking-[0.12em] text-text-muted">
+                          Recommended actions
+                        </p>
+                        <ol className="space-y-2">
+                          {summary.recommendedActions.map((action, i) => (
+                            <li key={action} className="flex gap-3 text-[13px] text-text-secondary">
+                              <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md border border-accent/30 bg-accent/10 font-mono text-[10px] text-accent">
+                                {i + 1}
+                              </span>
+                              {action}
+                            </li>
+                          ))}
+                        </ol>
+                      </div>
+                    )}
+                    {summary.iocs.length > 0 && (
+                      <div>
+                        <p className="mb-2 font-mono text-[10px] uppercase tracking-[0.12em] text-text-muted">
+                          Indicators
+                        </p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {summary.iocs.map((ioc) => (
+                            <span
+                              key={ioc}
+                              className="rounded-md border border-border-strong bg-bg-elevated px-2 py-0.5 font-mono text-[11.5px] text-text-primary"
+                            >
+                              {ioc}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <p className="text-sm text-text-muted">
+                    No summary yet — one generates shortly after the incident settles.
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+          </motion.div>
+
+          <motion.div {...fadeIn(0.12)}>
+            <KillChain alerts={alerts} />
+          </motion.div>
+
+          <motion.div {...fadeIn(0.18)}>
+            <Card>
+              <CardHeader>
+                <CardTitle>Timeline</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ol className="relative">
+                  <span
+                    aria-hidden
+                    className="absolute top-2 bottom-2 left-[5px] w-px bg-border-strong"
+                  />
+                  {alerts.map((alert) => (
+                    <li key={alert.alertId} className="relative flex gap-4 pb-5 last:pb-0">
+                      <span
+                        className="relative z-10 mt-1.5 h-[11px] w-[11px] shrink-0 rounded-full border-2 border-bg-panel"
+                        style={{ background: `var(--color-severity-${alert.severity})` }}
+                      />
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="text-[13.5px] font-medium text-text-primary">
+                            {ruleInfo(alert.ruleId)?.name ?? alert.ruleId}
+                          </span>
+                          <AttackTechnique ruleId={alert.ruleId} link />
+                          <Badge variant={alert.severity}>{alert.severity}</Badge>
+                          {alert.count !== undefined && (
+                            <span className="font-mono text-[11px] text-text-muted">
+                              ×{alert.count}
+                            </span>
+                          )}
+                        </div>
+                        <p className="mt-1 break-words font-mono text-[12px] text-text-secondary">
+                          {alert.message}
+                        </p>
+                      </div>
+                      <span className="shrink-0 font-mono text-[11px] tabular-nums text-text-muted">
+                        {formatDateTime(alert.timestamp)}
+                      </span>
+                    </li>
+                  ))}
+                </ol>
+              </CardContent>
+            </Card>
+          </motion.div>
+        </div>
+
+        <div className="space-y-5">
+          <motion.div {...fadeIn(0.08)}>
+            {role === 'viewer' ? (
+              <ReadOnlyActions incident={incident} />
+            ) : (
+              <IncidentActions incident={incident} />
+            )}
+          </motion.div>
+          {reputation && (
+            <motion.div {...fadeIn(0.14)}>
+              <ThreatIntelCard reputation={reputation} />
+            </motion.div>
+          )}
+        </div>
+      </div>
     </main>
   );
 }

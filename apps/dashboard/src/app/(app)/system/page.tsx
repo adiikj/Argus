@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import { useSystemHealth } from '@/lib/use-system-health';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge, type BadgeProps } from '@/components/ui/badge';
+import { PageHeader } from '../_components/page-header';
 
 function fadeIn(delay: number) {
   return {
@@ -14,11 +15,11 @@ function fadeIn(delay: number) {
 }
 
 function StatusBadge({ ok, label }: { ok: boolean; label: string }) {
-  return <Badge variant={ok ? 'low' : 'critical'}>{label}</Badge>;
+  return <Badge variant={ok ? 'ok' : 'critical'}>{label}</Badge>;
 }
 
 const ES_STATUS_VARIANT: Record<string, BadgeProps['variant']> = {
-  green: 'low',
+  green: 'ok',
   yellow: 'medium',
   red: 'critical',
 };
@@ -27,8 +28,11 @@ export default function SystemHealthPage() {
   const { data: health, isError, isLoading } = useSystemHealth();
 
   return (
-    <main className="mx-auto max-w-5xl px-6 py-8">
-      <h1 className="mb-6 text-lg font-semibold text-text-primary">System Health</h1>
+    <main className="mx-auto max-w-[1400px] px-4 py-8 sm:px-6 lg:px-8">
+      <PageHeader
+        title="System Health"
+        description="The infrastructure under the pipeline — Kafka consumer lag per group, the event store, and Postgres latency."
+      />
 
       {isLoading && <p className="text-sm text-text-secondary">Checking system health…</p>}
       {isError && (

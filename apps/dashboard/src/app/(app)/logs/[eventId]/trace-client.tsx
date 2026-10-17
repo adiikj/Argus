@@ -85,7 +85,7 @@ export function TraceClient({ eventId }: { eventId: string }) {
   const { event, alerts, incidents } = data;
 
   return (
-    <main className="mx-auto max-w-2xl px-6 py-8">
+    <main className="mx-auto max-w-3xl px-4 py-8 sm:px-6 lg:px-8">
       <Link
         href="/logs"
         className="mb-6 inline-flex items-center gap-1.5 text-xs text-text-secondary hover:text-text-primary"
@@ -94,8 +94,8 @@ export function TraceClient({ eventId }: { eventId: string }) {
         back to log explorer
       </Link>
 
-      <p className="mb-1 font-mono text-xs text-text-secondary">{eventId}</p>
-      <h1 className="mb-6 text-lg font-semibold text-text-primary">Pipeline trace</h1>
+      <h1 className="text-[22px] font-semibold tracking-tight text-text-primary">Pipeline trace</h1>
+      <p className="mt-1 mb-7 font-mono text-xs text-text-muted">{eventId}</p>
 
       <Stage title="Normalized" reached={!!event} delay={0}>
         {event ? (

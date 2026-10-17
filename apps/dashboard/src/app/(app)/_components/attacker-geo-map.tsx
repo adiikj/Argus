@@ -5,15 +5,12 @@ import { motion, AnimatePresence } from 'framer-motion';
 import type { GeoPoint, Severity } from '@argus/contracts';
 import { useRealtime, type IncidentRow } from '@/lib/realtime';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { cn } from '@/lib/utils';
+import { WORLD_DOTS, WORLD_VIEWBOX } from '@/lib/world-dots';
 
 // local ordering instead of @argus/contracts' SEVERITY_RANK: importing a value
 // from the contracts entry pulls all of Zod into the browser bundle
 const SEVERITY_ORDER: Severity[] = ['info', 'low', 'medium', 'high', 'critical'];
 const rank = (s: Severity): number => SEVERITY_ORDER.indexOf(s);
-
-const MERIDIANS = [-150, -120, -90, -60, -30, 0, 30, 60, 90, 120, 150];
-const PARALLELS = [-60, -30, 0, 30, 60];
 
 // a single fixed point standing in for "us" — arcs converge on it. Not a real
 // place any more than the attacker pins are; labeled plainly via title.
@@ -30,8 +27,11 @@ const SEVERITY_VAR: Record<Severity, string> = {
 const ARC_LIFETIME_MS = 3800;
 const MAX_ARCS = 15;
 
+// same equirectangular projection the dot map was generated with (world-dots.ts)
+const { width: W, height: H, latTop, latBottom } = WORLD_VIEWBOX;
 function project(lat: number, lng: number): { x: number; y: number } {
-  return { x: ((lng + 180) / 360) * 100, y: ((90 - lat) / 180) * 100 };
+  const clamped = Math.min(latTop, Math.max(latBottom, lat));
+  return { x: ((lng + 180) / 360) * W, y: ((latTop - clamped) / (latTop - latBottom)) * H };
 }
 
 interface Pin extends GeoPoint {
@@ -51,7 +51,8 @@ function pinKey(geo: GeoPoint): string {
 
 function arcPath(from: { x: number; y: number }, to: { x: number; y: number }): string {
   const mx = (from.x + to.x) / 2;
-  const my = (from.y + to.y) / 2 - Math.min(20, Math.abs(to.x - from.x) * 0.25 + 6);
+  const my =
+    (from.y + to.y) / 2 - Math.min(120, Math.hypot(to.x - from.x, to.y - from.y) * 0.3 + 20);
   return `M ${from.x} ${from.y} Q ${mx} ${my} ${to.x} ${to.y}`;
 }
 
@@ -138,96 +139,115 @@ export function AttackerGeoMap() {
         </CardDescription>
       </CardHeader>
       <CardContent>
-        {pins.length === 0 ? (
-          <div className="flex h-56 items-center justify-center text-sm text-text-secondary">
-            No incidents yet.
-          </div>
-        ) : (
-          <div className="relative h-56 overflow-hidden rounded-md border border-border-subtle bg-bg-elevated">
-            {MERIDIANS.map((lng) => (
-              <div
-                key={`v-${lng}`}
-                className="absolute top-0 bottom-0 w-px bg-border-subtle/40"
-                style={{ left: `${project(0, lng).x}%` }}
-              />
-            ))}
-            {PARALLELS.map((lat) => (
-              <div
-                key={`h-${lat}`}
-                className="absolute left-0 right-0 h-px bg-border-subtle/40"
-                style={{ top: `${project(lat, 0).y}%` }}
-              />
-            ))}
+        <div
+          className="relative w-full overflow-hidden rounded-lg border border-border-subtle bg-bg-base/60"
+          style={{ aspectRatio: `${W} / ${H}` }}
+        >
+          <svg viewBox={`0 0 ${W} ${H}`} className="absolute inset-0 h-full w-full">
+            <defs>
+              <radialGradient id="pin-glow">
+                <stop offset="0%" stopColor="white" stopOpacity={0.55} />
+                <stop offset="100%" stopColor="white" stopOpacity={0} />
+              </radialGradient>
+            </defs>
 
-            <svg
-              className="absolute inset-0 h-full w-full"
-              viewBox="0 0 100 100"
-              preserveAspectRatio="none"
-            >
-              <AnimatePresence>
-                {arcs.map((arc) => (
-                  <motion.path
-                    key={arc.id}
-                    d={arcPath(arc.from, target)}
-                    fill="none"
-                    stroke={arc.color}
-                    strokeWidth={0.6}
-                    vectorEffect="non-scaling-stroke"
-                    initial={{ pathLength: 0, opacity: 1 }}
-                    animate={{ pathLength: 1, opacity: [1, 1, 0] }}
-                    exit={{ opacity: 0 }}
-                    transition={{
-                      pathLength: { duration: 0.8, ease: 'easeOut' },
-                      opacity: { duration: ARC_LIFETIME_MS / 1000, times: [0, 0.6, 1] },
-                    }}
-                  />
-                ))}
-              </AnimatePresence>
-            </svg>
+            {/* land as a dot matrix */}
+            <path
+              d={WORLD_DOTS}
+              stroke="var(--color-text-secondary)"
+              strokeOpacity={0.32}
+              strokeWidth={3.4}
+              strokeLinecap="round"
+              fill="none"
+            />
 
-            <div
-              className="absolute -translate-x-1/2 -translate-y-1/2"
-              style={{ left: `${target.x}%`, top: `${target.y}%` }}
-              title="Argus — monitored infrastructure"
-            >
-              <motion.span
-                key={pulse}
-                animate={pulse > 0 ? { scale: [1, 1.6, 1] } : {}}
-                transition={{ duration: 0.6, ease: 'easeOut' }}
-                className="block h-3 w-3 rounded-sm border-2 border-accent bg-bg-elevated"
-              />
-            </div>
+            <AnimatePresence>
+              {arcs.map((arc) => (
+                <motion.path
+                  key={arc.id}
+                  d={arcPath(arc.from, target)}
+                  fill="none"
+                  stroke={arc.color}
+                  strokeWidth={1.6}
+                  strokeLinecap="round"
+                  initial={{ pathLength: 0, opacity: 1 }}
+                  animate={{ pathLength: 1, opacity: [1, 1, 0] }}
+                  exit={{ opacity: 0 }}
+                  transition={{
+                    pathLength: { duration: 0.9, ease: 'easeOut' },
+                    opacity: { duration: ARC_LIFETIME_MS / 1000, times: [0, 0.6, 1] },
+                  }}
+                />
+              ))}
+            </AnimatePresence>
 
             {pins.map((pin) => {
               const { x, y } = project(pin.lat, pin.lng);
-              const size = 6 + (pin.count / maxCount) * 10;
+              const r = 4.5 + (pin.count / maxCount) * 6;
+              const color = SEVERITY_VAR[pin.severity];
               return (
-                <div
-                  key={pinKey(pin)}
-                  className="absolute -translate-x-1/2 -translate-y-1/2"
-                  style={{ left: `${x}%`, top: `${y}%` }}
-                  title={`${pin.city ? `${pin.city}, ` : ''}${pin.countryName}${pin.source === 'simulated' ? ' (simulated)' : ''} — ${pin.count} incident${pin.count === 1 ? '' : 's'} (${pin.severity})`}
-                >
-                  {/* real lookups solid, simulated demo pins hollow */}
-                  <span
-                    className={cn(
-                      'block animate-pulse rounded-full',
-                      pin.source === 'simulated' && 'border-2 bg-transparent',
-                    )}
-                    style={{
-                      width: size,
-                      height: size,
-                      backgroundColor:
-                        pin.source === 'dbip' ? SEVERITY_VAR[pin.severity] : undefined,
-                      borderColor: SEVERITY_VAR[pin.severity],
-                      opacity: 0.75,
-                    }}
-                  />
-                </div>
+                <g key={pinKey(pin)}>
+                  <title>
+                    {`${pin.city ? `${pin.city}, ` : ''}${pin.countryName}${pin.source === 'simulated' ? ' (simulated)' : ''} — ${pin.count} incident${pin.count === 1 ? '' : 's'} (${pin.severity})`}
+                  </title>
+                  <circle cx={x} cy={y} r={r * 2.6} fill={color} opacity={0.12} />
+                  {pin.source === 'dbip' ? (
+                    <circle
+                      cx={x}
+                      cy={y}
+                      r={r}
+                      fill={color}
+                      stroke="var(--color-bg-base)"
+                      strokeWidth={1.5}
+                    />
+                  ) : (
+                    <circle
+                      cx={x}
+                      cy={y}
+                      r={r}
+                      fill="var(--color-bg-base)"
+                      stroke={color}
+                      strokeWidth={2.2}
+                    />
+                  )}
+                </g>
               );
             })}
-          </div>
-        )}
+
+            {/* Argus — where every arc lands */}
+            <g>
+              <title>Argus — monitored infrastructure</title>
+              <motion.circle
+                key={pulse}
+                cx={target.x}
+                cy={target.y}
+                r={9}
+                fill="none"
+                stroke="var(--color-accent)"
+                strokeWidth={1.5}
+                initial={{ scale: 1, opacity: 0.9 }}
+                animate={pulse > 0 ? { scale: [1, 2.2], opacity: [0.9, 0] } : {}}
+                transition={{ duration: 1.1, ease: 'easeOut' }}
+                style={{ transformOrigin: `${target.x}px ${target.y}px` }}
+              />
+              <rect
+                x={target.x - 5}
+                y={target.y - 5}
+                width={10}
+                height={10}
+                rx={2.5}
+                fill="var(--color-bg-base)"
+                stroke="var(--color-accent)"
+                strokeWidth={2.2}
+              />
+            </g>
+          </svg>
+          {pins.length === 0 && (
+            <div className="absolute inset-0 flex items-center justify-center text-sm text-text-muted">
+              No incidents yet.
+            </div>
+          )}
+        </div>
         <div className="mt-2 flex flex-wrap items-center justify-between gap-2 font-mono text-[10px] text-text-secondary">
           <span className="flex items-center gap-3">
             <span className="flex items-center gap-1">
