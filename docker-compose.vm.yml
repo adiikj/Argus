@@ -1,13 +1,10 @@
 # Backend-only production stack for a small, shared VM. The dashboard runs on
-# Vercel; this file is api + generator + Kafka + Postgres + Redis, sized to
-# share ~4 GB with other apps (Argus budget ~1 GB). Images are built and
-# vulnerability-scanned in CI (.github/workflows/images.yml) — the VM only pulls.
+# Vercel and Postgres is Azure Database for PostgreSQL (managed, TLS-only);
+# this file is api + generator + Kafka + Redis, sized to share ~4 GB with
+# other apps. Images are built and vulnerability-scanned in CI
+# (.github/workflows/images.yml) — the VM only pulls. Day-to-day: deploy/vm.sh.
 #
-#   cp .env.vm.example .env.vm        # fill in, then:
-#   docker compose -f docker-compose.vm.yml --env-file .env.vm pull
-#   docker compose -f docker-compose.vm.yml --env-file .env.vm up -d
-#
-# Nothing here is reachable from outside the VM: datastores publish no ports,
+# Nothing here is reachable from outside the VM: Kafka/Redis publish no ports,
 # api/generator bind 127.0.0.1 only. A reverse proxy terminates TLS in front —
 # the bundled Caddy (`--profile caddy`) or the host's existing nginx
 # (deploy/nginx/argus.conf).
@@ -26,7 +23,7 @@ x-app-env: &app-env
   NODE_ENV: production
   LOG_LEVEL: ${LOG_LEVEL:-info}
   KAFKA_BROKERS: kafka:19092
-  POSTGRES_URL: postgresql://argus:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env.vm}@postgres:5432/argus
+  POSTGRES_URL: ${POSTGRES_URL:?set POSTGRES_URL in .env.vm (Azure Postgres, sslmode=require)}
   AUTH_SECRET: ${AUTH_SECRET:?set AUTH_SECRET in .env.vm (openssl rand -hex 32)}
   CORS_ORIGIN: ${CORS_ORIGIN:?set CORS_ORIGIN to the Vercel dashboard origin(s)}
   # the proxy reaches the containers from a private Docker address — trusted;
@@ -71,36 +68,6 @@ services:
       retries: 20
       start_period: 30s
 
-  postgres:
-    image: postgres:16-alpine
-    container_name: argus-postgres
-    restart: unless-stopped
-    logging: *logging
-    mem_limit: 256m
-    # small-box tuning: Argus holds a handful of connections and a modest dataset
-    command:
-      - postgres
-      - -c
-      - shared_buffers=64MB
-      - -c
-      - effective_cache_size=160MB
-      - -c
-      - work_mem=4MB
-      - -c
-      - max_connections=40
-    environment:
-      POSTGRES_USER: argus
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env.vm}
-      POSTGRES_DB: argus
-    volumes:
-      - pg_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U argus -d argus']
-      interval: 10s
-      timeout: 5s
-      retries: 12
-      start_period: 10s
-
   # detection windows/baselines + the internal bus. Every Argus key has a TTL,
   # so volatile-lru can always make room; no persistence — it's all derivable
   # short-lived state, not worth the disk writes.
@@ -137,10 +104,8 @@ services:
     working_dir: /app/apps/api
     command: ['./node_modules/.bin/prisma', 'migrate', 'deploy']
     environment:
-      POSTGRES_URL: postgresql://argus:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env.vm}@postgres:5432/argus
+      POSTGRES_URL: ${POSTGRES_URL:?set POSTGRES_URL in .env.vm (Azure Postgres, sslmode=require)}
       CHECKPOINT_DISABLE: '1'
-    depends_on:
-      postgres: { condition: service_healthy }
 
   api:
     image: ${ARGUS_API_IMAGE:-ghcr.io/adiikj/argus-api:latest}
@@ -174,7 +139,6 @@ services:
       start_period: 30s
     depends_on:
       kafka: { condition: service_healthy }
-      postgres: { condition: service_healthy }
       redis: { condition: service_healthy }
       migrate: { condition: service_completed_successfully }
 
@@ -230,6 +194,5 @@ services:
 
 volumes:
   kafka_data:
-  pg_data:
   caddy_data:
   caddy_config:

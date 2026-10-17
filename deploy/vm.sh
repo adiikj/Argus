@@ -18,7 +18,10 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 ENV_FILE=${ENV_FILE:-.env.vm}
 COMPOSE=(docker compose -f docker-compose.vm.yml --env-file "$ENV_FILE")
-ARGUS_CONTAINERS=(argus-kafka argus-postgres argus-redis argus-api argus-generator)
+ARGUS_CONTAINERS=(argus-kafka argus-redis argus-api argus-generator)
+# throwaway client for psql/pg_dump against the managed database — pg_dump must
+# be at least the server's major version, so this tracks the newest Postgres
+PG_CLIENT_IMAGE=${PG_CLIENT_IMAGE:-postgres:18-alpine}
 
 FAILS=0
 ok() { printf '  \033[32m✓\033[0m %s\n' "$*"; }
@@ -52,9 +55,9 @@ random_hex() { # $1 bytes of CSPRNG output, hex-encoded
 # Creates $ENV_FILE from "$ENV_FILE.example" (if missing) and fills every
 # secret that's still empty with fresh random hex. Run it ON the machine that
 # uses the file, so the secrets are never generated or stored anywhere else.
-# Never overwrites a value that's already set: Postgres only applies
-# POSTGRES_PASSWORD when its volume is first created, so changing it later
-# would lock the api out of its own database; a new AUTH_SECRET logs everyone out.
+# Never overwrites a value that's already set — a new AUTH_SECRET logs everyone
+# out. (POSTGRES_URL is filled in by hand: its password belongs to the Azure
+# database role, not to anything generated here.)
 cmd_init() {
   local template="$ENV_FILE.example"
   if [[ ! -f $ENV_FILE ]]; then
@@ -68,7 +71,7 @@ cmd_init() {
   chmod 600 "$ENV_FILE"
 
   local key bytes generated=0
-  for spec in POSTGRES_PASSWORD:24 AUTH_SECRET:32; do
+  for spec in AUTH_SECRET:32; do
     key=${spec%%:*}
     bytes=${spec##*:}
     grep -qE "^$key=" "$ENV_FILE" || continue # not used by this env file
@@ -82,11 +85,27 @@ cmd_init() {
   done
 
   local missing=()
-  for key in CORS_ORIGIN API_HOST; do
-    grep -qE "^$key=" "$ENV_FILE" && [[ -z $(env_get "$key") ]] && missing+=("$key")
+  for key in POSTGRES_URL CORS_ORIGIN API_HOST; do
+    local value
+    value=$(env_get "$key")
+    grep -qE "^$key=" "$ENV_FILE" && [[ -z $value || $value == *'<'* ]] && missing+=("$key")
   done
   if ((${#missing[@]} > 0)); then warn "still to fill in by hand: ${missing[*]}"; fi
   ok "$ENV_FILE ready (mode 600, $generated secret(s) generated)"
+}
+
+# POSTGRES_URL as libpq (psql/pg_dump) accepts it: Prisma-only query params
+# (connection_limit, pool_timeout, …) make libpq reject the whole URI.
+libpq_url() {
+  env_get POSTGRES_URL | sed -E \
+    -e 's/([?&])(connection_limit|pool_timeout|pgbouncer|socket_timeout|schema|statement_cache_size)=[^&]*/\1/g' \
+    -e 's/&&+/\&/g' -e 's/\?&/?/' -e 's/[?&]$//'
+}
+
+# run a libpq client in a throwaway container; the URL (it carries the password)
+# goes in via the environment, not the docker command line
+pg_client() {
+  docker run --rm -i -e PGURL="$(libpq_url)" "$PG_CLIENT_IMAGE" sh -c "$1"' "$PGURL"'
 }
 
 port_owner() { # prints the listener on 127.0.0.1/0.0.0.0:$1, if any
@@ -109,9 +128,22 @@ cmd_preflight() {
     local mode
     mode=$(stat -c %a "$ENV_FILE")
     if [[ $mode == 600 || $mode == 400 ]]; then ok "permissions $mode"; else fail "permissions $mode — holds secrets: chmod 600 $ENV_FILE"; fi
-    for key in POSTGRES_PASSWORD AUTH_SECRET CORS_ORIGIN API_HOST; do
-      if [[ -n $(env_get "$key") ]]; then ok "$key set"; else fail "$key is empty"; fi
+    for key in POSTGRES_URL AUTH_SECRET CORS_ORIGIN API_HOST; do
+      local value
+      value=$(env_get "$key")
+      if [[ -z $value ]]; then
+        fail "$key is empty"
+      elif [[ $value == *'<'*'>'* ]]; then
+        fail "$key still has a <placeholder> from the template"
+      else
+        ok "$key set"
+      fi
     done
+    local pg_url
+    pg_url=$(env_get POSTGRES_URL)
+    if [[ -n $pg_url && ! $pg_url =~ sslmode=(require|verify-ca|verify-full) ]]; then
+      fail "POSTGRES_URL must have sslmode=require (or verify-full) — the database is reached over the internet"
+    fi
     local secret cors
     secret=$(env_get AUTH_SECRET)
     if [[ -n $secret && ${#secret} -lt 32 ]]; then warn "AUTH_SECRET is ${#secret} chars — use openssl rand -hex 32"; fi
@@ -157,6 +189,21 @@ cmd_preflight() {
     image=$(env_get ARGUS_API_IMAGE)
     image=${image:-ghcr.io/adiikj/argus-api:latest}
     if docker manifest inspect "$image" >/dev/null 2>&1; then ok "can pull $image"; else fail "cannot pull $image — make the GHCR package public, or docker login ghcr.io (PAT: read:packages)"; fi
+
+    local pg_url
+    pg_url=$(env_get POSTGRES_URL)
+    if [[ -n $pg_url && $pg_url != *'<'* ]]; then
+      local db_out
+      # a real login over TLS: proves DNS, the Azure firewall rule for this VM,
+      # the role's password and that the database exists — all in one go
+      if db_out=$(pg_client 'psql -tA -v ON_ERROR_STOP=1 -c "select current_user, current_database(), current_setting('"'"'server_version'"'"'), (select ssl from pg_stat_ssl where pid = pg_backend_pid())" ' 2>&1); then
+        IFS='|' read -r db_user db_name db_version db_ssl <<<"$(tr -d '\r' <<<"$db_out" | tail -n1)"
+        ok "Postgres login works: $db_user@$db_name (server $db_version, ssl=$db_ssl)"
+        [[ $db_ssl == t ]] || fail "connection is not encrypted"
+      else
+        fail "cannot log in to Postgres: $(tail -n1 <<<"$db_out") — check the Azure firewall allows this VM's IP, and the role/password/database"
+      fi
+    fi
   fi
 
   echo
@@ -223,7 +270,7 @@ cmd_backup() {
   file="$dir/argus-$(date +%Y%m%d-%H%M%S).sql.gz"
   (
     umask 077 # the dump contains password hashes
-    "${COMPOSE[@]}" exec -T postgres pg_dump -U argus argus | gzip >"$file"
+    pg_client 'pg_dump --no-owner --no-privileges' | gzip >"$file"
   )
   ok "wrote $file ($(du -h "$file" | cut -f1))"
 }
