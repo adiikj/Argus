@@ -1,4 +1,4 @@
-# Bundled TLS proxy for docker-compose.vm.yml (`--profile caddy`). Caddy gets
+# Bundled TLS proxy for deploy/docker-compose.vm.yml (`--profile caddy`). Caddy gets
 # and renews the Let's Encrypt certificate for API_HOST on its own.
 {
 	email {$ACME_EMAIL}

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Argus VM operations — a thin wrapper around docker-compose.vm.yml, run from
+# Argus VM operations — a thin wrapper around deploy/docker-compose.vm.yml, run from
 # anywhere inside the repo checkout on the VM:
 #
 #   ./deploy/vm.sh init               create .env.vm with freshly generated secrets
@@ -18,7 +18,7 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 ENV_FILE=${ENV_FILE:-.env.vm}
-COMPOSE=(docker compose -f docker-compose.vm.yml --env-file "$ENV_FILE")
+COMPOSE=(docker compose -f deploy/docker-compose.vm.yml --env-file "$ENV_FILE")
 ARGUS_CONTAINERS=(argus-kafka argus-redis argus-api argus-generator)
 # throwaway client for psql/pg_dump against the managed database — pg_dump must
 # be at least the server's major version, so this tracks the newest Postgres
@@ -43,7 +43,7 @@ env_get() {
   grep -E "^$1=" "$ENV_FILE" | tail -n1 | cut -d= -f2- | sed -E "s/^['\"]|['\"]$//g" || true
 }
 
-need_env_file() { [[ -f $ENV_FILE ]] || die "$ENV_FILE not found — cp .env.vm.example $ENV_FILE and fill it in"; }
+need_env_file() { [[ -f $ENV_FILE ]] || die "$ENV_FILE not found — cp deploy/.env.vm.example $ENV_FILE and fill it in"; }
 
 random_hex() { # $1 bytes of CSPRNG output, hex-encoded
   if command -v openssl >/dev/null 2>&1; then
@@ -61,6 +61,7 @@ random_hex() { # $1 bytes of CSPRNG output, hex-encoded
 # database role, not to anything generated here.)
 cmd_init() {
   local template="$ENV_FILE.example"
+  [[ -f $template ]] || template="deploy/$(basename "$ENV_FILE").example"
   if [[ ! -f $ENV_FILE ]]; then
     [[ -f $template ]] || die "no $ENV_FILE and no $template to create it from"
     (
@@ -152,7 +153,7 @@ cmd_preflight() {
     if [[ $cors == *'*'* ]]; then fail "CORS_ORIGIN must be the dashboard origin(s), not *"; fi
     if [[ -n $cors && $cors != https://* ]]; then warn "CORS_ORIGIN should be https:// (the Vercel URL)"; fi
   else
-    fail "$ENV_FILE missing — cp .env.vm.example $ENV_FILE && chmod 600 $ENV_FILE"
+    fail "$ENV_FILE missing — cp deploy/.env.vm.example $ENV_FILE && chmod 600 $ENV_FILE"
   fi
 
   echo "Ports (127.0.0.1)"
