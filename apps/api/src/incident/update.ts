@@ -4,14 +4,10 @@ import { canTransition } from './transitions.js';
 import { incidentRowToContract } from './mappers.js';
 
 export type PatchIncidentError =
-  | 'not_found'
-  | 'invalid_transition'
-  | 'resolution_note_required'
-  | 'assignee_not_found';
+  'not_found' | 'invalid_transition' | 'resolution_note_required' | 'assignee_not_found';
 
 export type PatchIncidentResult =
-  | { ok: true; incident: Incident }
-  | { ok: false; error: PatchIncidentError };
+  { ok: true; incident: Incident } | { ok: false; error: PatchIncidentError };
 
 const TERMINAL_STATUSES = new Set(['resolved', 'false_positive']);
 

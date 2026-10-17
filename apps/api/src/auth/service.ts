@@ -9,8 +9,7 @@ export interface AuthResult {
 }
 
 export type RegisterResult =
-  | { ok: true; result: AuthResult }
-  | { ok: false; error: 'taken' | 'disabled' };
+  { ok: true; result: AuthResult } | { ok: false; error: 'taken' | 'disabled' };
 
 export interface AuthService {
   readonly googleClientId: string | undefined;

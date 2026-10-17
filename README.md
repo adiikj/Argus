@@ -151,6 +151,7 @@ signed session token and enforced server-side on every request.
 `GOOGLE_CLIENT_ID` (api) and `NEXT_PUBLIC_GOOGLE_CLIENT_ID` (dashboard, same value) to enable Google
 sign-in alongside email+password; leave both blank to run email+password only. The generator's
 `/simulate/:scenario` and every api REST endpoint are token-bucket rate limited regardless (login/
-register/Google endpoints get a tighter limiter against brute-forcing; `TRUST_PROXY` makes the
-limiter key on the real client IP behind a reverse proxy), so a public demo URL can't be
+register/Google endpoints get a tighter limiter against brute-forcing; `TRUST_PROXY` — the proxy's
+addresses, e.g. `loopback,uniquelocal` — makes the limiter key on the real client IP behind a
+reverse proxy), so a public demo URL can't be
 scripted into hammering the LLM's free-tier quota or guessing passwords.

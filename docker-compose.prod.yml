@@ -135,8 +135,8 @@ services:
       ALLOW_REGISTRATION: ${ALLOW_REGISTRATION:-false}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
       CORS_ORIGIN: ${CORS_ORIGIN:?set to the dashboard origin(s), comma-separated}
-      # one hop: cloudflared sits in front, so its X-Forwarded-For entry is the real client
-      TRUST_PROXY: ${TRUST_PROXY:-1}
+      # the proxy (cloudflared) reaches us over the private compose network
+      TRUST_PROXY: ${TRUST_PROXY:-loopback,uniquelocal}
       REDIS_URL: ${REDIS_URL:-}
       SLACK_WEBHOOK_URL: ${SLACK_WEBHOOK_URL:-}
       DASHBOARD_URL: ${DASHBOARD_URL:-}
@@ -159,7 +159,7 @@ services:
       DEMO_MODE: ${DEMO_MODE:-true}
       NOISE_INTERVAL_MS: ${NOISE_INTERVAL_MS:-3000}
       CORS_ORIGIN: ${CORS_ORIGIN:?set to the dashboard origin(s), comma-separated}
-      TRUST_PROXY: ${TRUST_PROXY:-1}
+      TRUST_PROXY: ${TRUST_PROXY:-loopback,uniquelocal}
       # generator shares @argus/config's env schema even though it never uses
       # auth — AUTH_SECRET is still required for loadConfig() to pass.
       AUTH_SECRET: ${AUTH_SECRET:?set a real secret in .env.prod}

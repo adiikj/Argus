@@ -3,27 +3,33 @@ import { dirname, join } from 'node:path';
 import { config as loadDotenv } from 'dotenv';
 import { z } from 'zod';
 
-// how many reverse-proxy hops sit in front of the api/generator (e.g. 1 for
-// nginx/Caddy/cloudflared), or a comma list of proxy IPs/CIDRs. Decides which
-// X-Forwarded-For entry becomes req.ip — the key every rate limiter uses.
-// 'false' (default) = no proxy, use the socket address. 'true' is rejected on
-// purpose: trusting every hop makes req.ip the *left-most* XFF entry, which the
-// client writes itself — anyone could dodge the limiters by forging the header.
+// which peers are trusted reverse proxies — a comma list of IPs/CIDRs or
+// proxy-addr's named ranges (loopback, linklocal, uniquelocal). Decides which
+// X-Forwarded-For entry becomes req.ip — the key every rate limiter uses:
+// Fastify walks XFF from the right and stops at the first untrusted address.
+// Behind nginx/Caddy/cloudflared in Docker: 'loopback,uniquelocal' (the
+// private ranges Docker networks live in). 'false' (default) = no proxy.
+//
+// Rejected on purpose:
+//   - 'true': trusts every hop, so req.ip becomes the *left-most* XFF entry,
+//     which the client writes itself — anyone could pick their own IP.
+//   - a hop count ('1'): can't verify the immediate peer is actually the
+//     proxy, so a client reaching the port directly could forge XFF. Fastify
+//     >=5.12 fails closed on it (trusts nothing), which would silently put
+//     every visitor back in one shared rate-limit bucket.
 export const TrustProxy = z
   .string()
   .default('false')
-  .transform((raw, ctx): false | number | string[] => {
+  .transform((raw, ctx): false | string[] => {
     const value = raw.trim();
-    if (value === '' || value === 'false' || value === '0') return false;
-    if (value === 'true') {
+    if (value === '' || value === 'false') return false;
+    if (value === 'true' || /^\d+$/.test(value)) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message:
-          "'true' trusts client-supplied X-Forwarded-For — use a hop count (e.g. 1) or proxy IPs/CIDRs",
+        message: `TRUST_PROXY='${value}' is not allowed — list the proxy's addresses instead, e.g. 'loopback,uniquelocal' or '172.18.0.0/16'`,
       });
       return z.NEVER;
     }
-    if (/^\d+$/.test(value)) return Number(value);
     return value
       .split(',')
       .map((entry) => entry.trim())

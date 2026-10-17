@@ -47,20 +47,34 @@ describe('RateLimiter', () => {
 // the rate limiters key on req.ip, so what Fastify resolves it to behind a
 // proxy is the security property that matters — pinned here end to end.
 describe('client IP behind a proxy', () => {
-  async function resolvedIp(trustProxy: string, xff: string): Promise<string> {
+  async function resolvedIp(
+    trustProxy: string,
+    xff: string,
+    remoteAddress = '172.18.0.5', // the reverse proxy's container address
+  ): Promise<string> {
     const app = Fastify({ trustProxy: TrustProxy.parse(trustProxy) });
     app.get('/ip', async (req) => req.ip);
     const res = await app.inject({
       url: '/ip',
-      remoteAddress: '172.18.0.5', // the reverse proxy's container address
+      remoteAddress,
       headers: { 'x-forwarded-for': xff },
     });
     await app.close();
     return res.body;
   }
 
-  it('one trusted hop takes the entry the proxy appended, not a forged one', async () => {
-    expect(await resolvedIp('1', '6.6.6.6, 203.0.113.7')).toBe('203.0.113.7');
+  it('a trusted proxy yields the entry it appended, not a forged one', async () => {
+    expect(await resolvedIp('loopback,uniquelocal', '6.6.6.6, 203.0.113.7')).toBe('203.0.113.7');
+  });
+
+  it('a forged private address in XFF does not get trusted through', async () => {
+    expect(await resolvedIp('loopback,uniquelocal', '10.0.0.1, 203.0.113.7')).toBe('203.0.113.7');
+  });
+
+  it('a client hitting the port directly cannot spoof its IP via XFF', async () => {
+    expect(await resolvedIp('loopback,uniquelocal', '6.6.6.6', '198.51.100.9')).toBe(
+      '198.51.100.9',
+    );
   });
 
   it('with no proxy trusted, ignores X-Forwarded-For entirely', async () => {
