@@ -1,5 +1,7 @@
 # Build from the repo root: docker build -f apps/api/Dockerfile .
 FROM node:24-alpine AS base
+# Prisma's engines link against OpenSSL — Alpine doesn't ship it by default.
+RUN apk add --no-cache openssl
 RUN corepack enable
 RUN npm install -g turbo@^2.3.3
 
@@ -18,7 +20,9 @@ RUN pnpm --filter @argus/api exec prisma generate
 RUN pnpm turbo run build --filter=@argus/api
 
 # a second, --prod-only install so the runner never inherits devDependencies
-# (tsc, turbo, the prisma CLI) that the installer stage needed to build.
+# (tsc, turbo) that the installer stage needed to build. The prisma CLI is a
+# real dependency on purpose: the same image runs `prisma migrate deploy` as
+# the one-shot `migrate` service in docker-compose.prod.yml.
 FROM base AS prod-deps
 WORKDIR /app
 COPY --from=pruner /app/out/json/ .
