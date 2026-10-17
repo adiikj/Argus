@@ -73,6 +73,9 @@ const EnvSchema = z.object({
   // generator background-noise cadence: one benign event per interval. ~1.2s
   // reads as a busy live system locally; 3–5s keeps a small VM's disk + CPU calm.
   NOISE_INTERVAL_MS: z.coerce.number().int().min(100).default(1200),
+  // generator: tail this real nginx access log into the pipeline alongside the
+  // synthetic traffic (on the deploy VM: api.argus.buzz's probe log). Unset = off.
+  SHIP_NGINX_LOG: z.string().optional(),
 
   DEMO_MODE: z
     .enum(['true', 'false'])

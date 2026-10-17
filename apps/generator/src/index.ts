@@ -5,6 +5,7 @@ import type { RawLog } from '@argus/contracts';
 import { createRawLogProducer } from './kafka.js';
 import { benignEvent, SCENARIOS, SCENARIO_NAMES } from './scenarios.js';
 import { createSimulatorServer } from './server.js';
+import { startLogTail } from './tail.js';
 
 const config = loadConfig();
 const log = createLogger({ name: 'generator', level: config.LOG_LEVEL });
@@ -46,6 +47,12 @@ await createSimulatorServer({
   trustProxy: config.TRUST_PROXY,
 });
 log.info({ port: config.GENERATOR_PORT, scenarios: SCENARIO_NAMES }, 'simulator API listening');
+
+// layer 3: real traffic — internet scanners probing the deployed api, from
+// nginx's probe log (see tail.ts). Off unless SHIP_NGINX_LOG is set.
+if (config.SHIP_NGINX_LOG) {
+  await startLogTail({ path: config.SHIP_NGINX_LOG, emit, log });
+}
 
 // the lazy path: a scripted timeline shortly after boot, so an unattended
 // `docker compose up` still shows alerts/incidents within ~30s (§15).
