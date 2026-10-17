@@ -40,3 +40,6 @@ Thumbs.db
 *.md
 !README.md
 /docs
+
+# database dumps from deploy/vm.sh backup
+backups/
