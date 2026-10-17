@@ -48,6 +48,7 @@ import { startWebhookNotifier } from './notifications/index.js';
 import { getSystemHealth } from './system/index.js';
 import { startRetention } from './retention/index.js';
 import { createGeoLocator } from './geo/index.js';
+import { createThreatIntel } from './intel/index.js';
 import { createAuthService, listUsers, type AuthService } from './auth/index.js';
 
 const config = loadConfig();
@@ -155,7 +156,15 @@ async function startRealtime(
 ): Promise<void> {
   await createRealtimeServer(bus, config.PORT, {
     getMetrics: () => m.snapshot(),
-    getIncidentDetail: (id) => getIncidentDetail(prisma, id),
+    getIncidentDetail: async (id) => {
+      const detail = await getIncidentDetail(prisma, id);
+      if (!detail) return undefined;
+      // cache only: viewing an incident never spends threat-intel quota
+      return {
+        ...detail,
+        reputation: (await intel.cached(detail.incident.correlationKey)) ?? null,
+      };
+    },
     patchIncident: (id, input) => patchIncident(prisma, id, input),
     getRecentActivity: () => getRecentActivity(prisma),
     queryIncidents: async (question) => {
@@ -183,7 +192,7 @@ async function startRealtime(
 // ai: incident.created/updated -> LLMProvider (or template fallback) -> summaries, on the bus (§8)
 function startAi(prisma: PrismaClient, bus: Bus, m: Metrics): void {
   const provider = selectProvider(config);
-  startAiEngine({ prisma, bus, provider, log });
+  startAiEngine({ prisma, bus, provider, log, reputationFor: (ip) => intel.lookup(ip) });
   bus.on('summary.ready', () => m.incr('summariesGenerated'));
   log.info({ provider: provider.name }, 'ai summarization engine started');
 }
@@ -210,6 +219,11 @@ const kafka = createKafkaClient(config);
 await ensureTopics(kafka);
 
 const prisma = createPrismaClient(config);
+const intel = createThreatIntel({ prisma, apiKey: config.ABUSEIPDB_API_KEY, log });
+log.info(
+  { threatIntel: intel.enabled ? 'abuseipdb' : 'off' },
+  intel.enabled ? 'threat intel enabled' : 'no ABUSEIPDB_API_KEY — threat intel off',
+);
 
 // STORAGE_PROFILE=full backs the event store with Elasticsearch (default);
 // =lite uses Postgres FTS instead and never touches ES at all — no client,

@@ -54,6 +54,32 @@ describe('templateProvider ATT&CK context', () => {
   });
 });
 
+describe('templateProvider threat-intel context', () => {
+  it('adds the source reputation and escalates the first action for a known-bad IP', async () => {
+    const draft = await templateProvider.summarize({
+      incident: incident(),
+      alerts: [alert('sqli-attempt')],
+      reputation: {
+        ip: '198.51.100.1',
+        provider: 'abuseipdb',
+        abuseScore: 96,
+        totalReports: 1200,
+        distinctReporters: 310,
+        isTor: true,
+        usageType: 'Data Center/Web Hosting/Transit',
+        isp: 'Example Hosting',
+        domain: null,
+        countryCode: 'NL',
+        lastReportedAt: null,
+        checkedAt: '2026-10-17T12:00:00.000Z',
+      },
+    });
+    expect(draft.summary).toContain('AbuseIPDB abuse confidence 96/100');
+    expect(draft.summary).toContain('Tor exit node');
+    expect(draft.recommendedActions[0]).toContain('Block 198.51.100.1 at the edge');
+  });
+});
+
 describe('templateProvider.translateQuery', () => {
   it('extracts a known rule id from a keyword', async () => {
     const filter = await templateProvider.translateQuery('show sqli incidents');

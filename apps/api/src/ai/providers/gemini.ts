@@ -2,6 +2,7 @@ import { IncidentQuery } from '@argus/contracts';
 import {
   KNOWN_RULE_IDS,
   alertLine,
+  reputationLine,
   type LLMProvider,
   type SummaryDraft,
   type SummaryInput,
@@ -30,10 +31,11 @@ const QUERY_RESPONSE_SCHEMA = {
   },
 };
 
-function buildPrompt({ incident, alerts }: SummaryInput): string {
+function buildPrompt({ incident, alerts, reputation }: SummaryInput): string {
   const lines = alerts.map(alertLine).join('\n');
   return [
     `Security incident from entity ${incident.correlationKey}, severity ${incident.severity}.`,
+    ...(reputation ? [reputationLine(reputation)] : []),
     `Alerts (${alerts.length}):`,
     lines,
     'Summarize this incident for a SOC analyst, list indicators of compromise, and recommend next actions.',

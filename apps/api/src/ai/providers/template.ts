@@ -1,7 +1,7 @@
 import { IncidentQuery, type IncidentStatus, type Severity } from '@argus/contracts';
 import { ruleInfo } from '@argus/contracts/rules';
 import type { LLMProvider } from '../provider.js';
-import { KNOWN_RULE_IDS } from '../provider.js';
+import { reputationLine, type KNOWN_RULE_IDS } from '../provider.js';
 
 type RuleId = (typeof KNOWN_RULE_IDS)[number];
 
@@ -51,7 +51,7 @@ function parseSinceMinutes(q: string): number | undefined {
 
 export const templateProvider: LLMProvider = {
   name: 'template',
-  async summarize({ incident, alerts }) {
+  async summarize({ incident, alerts, reputation }) {
     const rules = [...new Set(alerts.map((a) => a.ruleId))];
     const described = rules.map((id) => {
       const technique = ruleInfo(id)?.technique.id;
@@ -64,9 +64,15 @@ export const templateProvider: LLMProvider = {
       summary:
         `${alerts.length} alert(s) from ${incident.correlationKey} across ${rules.length} rule(s): ${described.join(', ')}. ` +
         (tactics.length > 0 ? `MITRE ATT&CK tactics: ${tactics.join(', ')}. ` : '') +
-        `Current severity: ${incident.severity}.`,
+        `Current severity: ${incident.severity}.` +
+        (reputation ? ` ${reputationLine(reputation)}` : ''),
       iocs: [incident.correlationKey],
-      recommendedActions: [`Investigate activity from ${incident.correlationKey}`, ...playbook],
+      recommendedActions: [
+        reputation && reputation.abuseScore >= 75
+          ? `Block ${incident.correlationKey} at the edge — widely reported as abusive (AbuseIPDB ${reputation.abuseScore}/100)`
+          : `Investigate activity from ${incident.correlationKey}`,
+        ...playbook,
+      ],
     };
   },
   // zero-network keyword/regex parser — the always-available fallback tier,

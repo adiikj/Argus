@@ -1,7 +1,7 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
-import type { Alert, Incident, IncidentSummary } from '@argus/contracts';
+import type { Alert, Incident, IncidentSummary, IpReputation } from '@argus/contracts';
 import { API_URL } from './realtime';
 import { authFetch } from './auth';
 
@@ -9,6 +9,8 @@ export interface IncidentDetail {
   incident: Incident;
   alerts: Alert[];
   summary: IncidentSummary | undefined;
+  // source-IP threat intel (AbuseIPDB), when the api has any cached
+  reputation?: IpReputation | null;
 }
 
 async function fetchIncidentDetail(id: string): Promise<IncidentDetail> {

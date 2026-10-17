@@ -4,7 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { ArrowLeft } from 'lucide-react';
-import type { Incident, IncidentStatus } from '@argus/contracts';
+import type { Incident, IncidentStatus, IpReputation } from '@argus/contracts';
 import { useIncidentDetail } from '@/lib/use-incident-detail';
 import { usePatchIncident } from '@/lib/use-incident-mutation';
 import { useUsers } from '@/lib/use-users';
@@ -183,6 +183,78 @@ function IncidentActions({ incident }: { incident: Incident }) {
   );
 }
 
+function scoreVariant(score: number): BadgeProps['variant'] {
+  if (score >= 75) return 'critical';
+  if (score >= 25) return 'medium';
+  return 'low';
+}
+
+function Fact({ label, value }: { label: string; value: string | null }) {
+  if (!value) return null;
+  return (
+    <div>
+      <dt className="font-mono text-[10px] uppercase tracking-wider text-text-secondary">
+        {label}
+      </dt>
+      <dd className="text-sm text-text-primary">{value}</dd>
+    </div>
+  );
+}
+
+// source-IP reputation from AbuseIPDB (cached server-side; viewing never
+// spends lookup quota). Only real public IPs get one — demo traffic doesn't.
+function ThreatIntelCard({ reputation }: { reputation: IpReputation }) {
+  return (
+    <Card className="mb-6">
+      <CardHeader className="flex flex-row items-center justify-between space-y-0">
+        <CardTitle>Threat intel</CardTitle>
+        <a
+          href={`https://www.abuseipdb.com/check/${encodeURIComponent(reputation.ip)}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="font-mono text-[11px] text-accent hover:underline"
+        >
+          AbuseIPDB ↗
+        </a>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="flex items-center gap-3">
+          <Badge variant={scoreVariant(reputation.abuseScore)}>
+            abuse {reputation.abuseScore}/100
+          </Badge>
+          <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-bg-elevated">
+            <div
+              className="h-full rounded-full bg-current"
+              style={{
+                width: `${reputation.abuseScore}%`,
+                color: `var(--color-severity-${scoreVariant(reputation.abuseScore)})`,
+              }}
+            />
+          </div>
+          {reputation.isTor && <Badge variant="high">tor exit</Badge>}
+        </div>
+        <dl className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+          <Fact
+            label="Reports"
+            value={`${reputation.totalReports} from ${reputation.distinctReporters} source${reputation.distinctReporters === 1 ? '' : 's'}`}
+          />
+          <Fact label="Usage" value={reputation.usageType} />
+          <Fact label="ISP" value={reputation.isp} />
+          <Fact label="Domain" value={reputation.domain} />
+          <Fact label="Country" value={reputation.countryCode} />
+          <Fact
+            label="Last reported"
+            value={reputation.lastReportedAt ? formatDateTime(reputation.lastReportedAt) : 'never'}
+          />
+        </dl>
+        <p className="font-mono text-[10px] text-text-secondary">
+          checked {formatDateTime(reputation.checkedAt)}
+        </p>
+      </CardContent>
+    </Card>
+  );
+}
+
 export function IncidentDetailClient({ id }: { id: string }) {
   const { data, isLoading, isError } = useIncidentDetail(id);
   const role = useSessionRole();
@@ -205,7 +277,7 @@ export function IncidentDetailClient({ id }: { id: string }) {
     );
   }
 
-  const { incident, alerts, summary } = data;
+  const { incident, alerts, summary, reputation } = data;
 
   return (
     <main className="mx-auto max-w-3xl px-6 py-8">
@@ -288,6 +360,12 @@ export function IncidentDetailClient({ id }: { id: string }) {
           </CardContent>
         </Card>
       </motion.div>
+
+      {reputation && (
+        <motion.div {...fadeIn(0.2)}>
+          <ThreatIntelCard reputation={reputation} />
+        </motion.div>
+      )}
 
       <motion.div {...fadeIn(0.22)}>
         <KillChain alerts={alerts} />

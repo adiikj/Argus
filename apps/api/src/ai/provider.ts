@@ -1,4 +1,10 @@
-import type { Alert, Incident, IncidentQuery, IncidentSummary } from '@argus/contracts';
+import type {
+  Alert,
+  Incident,
+  IncidentQuery,
+  IncidentSummary,
+  IpReputation,
+} from '@argus/contracts';
 import { RULE_IDS, ruleInfo } from '@argus/contracts/rules';
 
 export type SummaryDraft = Omit<IncidentSummary, 'incidentId' | 'generatedBy' | 'generatedAt'>;
@@ -6,6 +12,20 @@ export type SummaryDraft = Omit<IncidentSummary, 'incidentId' | 'generatedBy' | 
 export interface SummaryInput {
   incident: Incident;
   alerts: Alert[];
+  // threat-intel context for the source IP, when there is any (apps/api/src/intel)
+  reputation?: IpReputation;
+}
+
+// reputation as one prompt line — reads the same in the template summary
+export function reputationLine(r: IpReputation): string {
+  const parts = [
+    `AbuseIPDB abuse confidence ${r.abuseScore}/100`,
+    `${r.totalReports} report(s) from ${r.distinctReporters} source(s)`,
+    r.usageType ? `usage: ${r.usageType}` : undefined,
+    r.isp ? `ISP: ${r.isp}` : undefined,
+    r.isTor ? 'Tor exit node' : undefined,
+  ];
+  return `Source IP reputation: ${parts.filter(Boolean).join('; ')}.`;
 }
 
 // every ruleId the detection engine can emit (from the shared rule catalog) —

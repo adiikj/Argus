@@ -1,5 +1,5 @@
 import type { Logger } from '@argus/logger';
-import { IncidentSummary, type Incident } from '@argus/contracts';
+import { IncidentSummary, type Incident, type IpReputation } from '@argus/contracts';
 import type { PrismaClient } from '../incident/index.js';
 import { loadIncidentWithAlerts } from '../incident/index.js';
 import type { Bus } from '../bus/index.js';
@@ -16,9 +16,11 @@ export interface AiEngineDeps {
   bus: Bus;
   provider: LLMProvider;
   log: Logger;
+  // source-IP reputation, fetched (or read from cache) just before summarizing
+  reputationFor?: (ip: string) => Promise<IpReputation | undefined>;
 }
 
-export function startAiEngine({ prisma, bus, provider, log }: AiEngineDeps): void {
+export function startAiEngine({ prisma, bus, provider, log, reputationFor }: AiEngineDeps): void {
   const state = new Map<string, SummarizedState>();
 
   const queue = createSummaryQueue({
@@ -26,8 +28,10 @@ export function startAiEngine({ prisma, bus, provider, log }: AiEngineDeps): voi
     debounceMs: DEBOUNCE_MS,
     run: async (incidentId) => {
       try {
-        const context = await loadIncidentWithAlerts(prisma, incidentId);
-        if (!context) return;
+        const loaded = await loadIncidentWithAlerts(prisma, incidentId);
+        if (!loaded) return;
+        const reputation = await reputationFor?.(loaded.incident.correlationKey);
+        const context = { ...loaded, reputation };
 
         let generatedBy: 'llm' | 'template' = provider.name;
         let draft;

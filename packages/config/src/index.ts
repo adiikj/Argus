@@ -119,6 +119,10 @@ const EnvSchema = z.object({
   // detection state and event fanout survive across more than one api process
   REDIS_URL: z.string().optional(),
 
+  // optional: AbuseIPDB reputation for incidents from real public IPs (free
+  // tier: 1,000 checks/day; Argus caps itself at 900). Unset = no lookups.
+  ABUSEIPDB_API_KEY: z.string().optional(),
+
   // optional: posts a Slack-compatible message on high/critical incidents,
   // same "runs with zero keys" degradation as the LLM/auth integrations
   SLACK_WEBHOOK_URL: z.string().optional(),

@@ -95,6 +95,25 @@ model Summary {
   @@map("summaries")
 }
 
+// threat-intel cache (apps/api/src/intel): one row per checked source IP,
+// refreshed after a TTL — keeps lookups inside the provider's daily quota
+model IpReputation {
+  ip                String    @id
+  provider          String
+  abuseScore        Int       @map("abuse_score")
+  totalReports      Int       @map("total_reports")
+  distinctReporters Int       @map("distinct_reporters")
+  isTor             Boolean   @map("is_tor")
+  usageType         String?   @map("usage_type")
+  isp               String?
+  domain            String?
+  countryCode       String?   @map("country_code")
+  lastReportedAt    DateTime? @map("last_reported_at")
+  checkedAt         DateTime  @map("checked_at")
+
+  @@map("ip_reputation")
+}
+
 // mirrors @argus/contracts' NormalizedEvent — the Postgres-FTS event store
 // used when STORAGE_PROFILE=lite instead of Elasticsearch (§ above).
 model NormalizedEventRow {

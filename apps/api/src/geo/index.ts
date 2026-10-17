@@ -37,6 +37,19 @@ for (const [net, prefix] of [
   NON_PUBLIC.addSubnet(net, prefix, 'ipv6');
 }
 
+export type IpClass = 'public' | 'documentation' | 'non-public' | 'invalid';
+
+// shared by GeoIP and threat intel: only 'public' addresses are ever looked
+// up — demo (documentation-range) and internal ones never leave the box
+export function classifyIp(ip: string): IpClass {
+  const family = isIP(ip);
+  if (family === 0) return 'invalid';
+  const type = family === 4 ? 'ipv4' : 'ipv6';
+  if (DOCUMENTATION.check(ip, type)) return 'documentation';
+  if (NON_PUBLIC.check(ip, type)) return 'non-public';
+  return 'public';
+}
+
 export type CountryLookup = (ip: string) => string | undefined; // -> ISO 3166-1 alpha-2
 
 export interface GeoLocator {
@@ -49,11 +62,9 @@ export function createGeoLocatorFrom(lookupCountry: CountryLookup | undefined): 
   return {
     backend: lookupCountry ? 'dbip' : 'none',
     locate(ip) {
-      const family = isIP(ip);
-      if (family === 0) return null; // entity isn't an IP at all
-      const type = family === 4 ? 'ipv4' : 'ipv6';
-      if (DOCUMENTATION.check(ip, type)) return simulatedGeo(ip);
-      if (NON_PUBLIC.check(ip, type) || !lookupCountry) return null;
+      const kind = classifyIp(ip);
+      if (kind === 'documentation') return simulatedGeo(ip);
+      if (kind !== 'public' || !lookupCountry) return null; // invalid / internal / no DB
 
       const iso = lookupCountry(ip);
       const centroid = iso ? COUNTRY_CENTROIDS[iso] : undefined;

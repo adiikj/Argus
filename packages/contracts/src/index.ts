@@ -146,6 +146,23 @@ export const RecentActivity = z.object({
 });
 export type RecentActivity = z.infer<typeof RecentActivity>;
 
+// threat-intel reputation of a source IP (AbuseIPDB), cached server-side
+export const IpReputation = z.object({
+  ip: z.string(),
+  provider: z.literal('abuseipdb'),
+  abuseScore: z.number().int().min(0).max(100), // AbuseIPDB "abuse confidence", %
+  totalReports: z.number().int().nonnegative(),
+  distinctReporters: z.number().int().nonnegative(),
+  isTor: z.boolean(),
+  usageType: z.string().nullable(), // "Data Center/Web Hosting/Transit", …
+  isp: z.string().nullable(),
+  domain: z.string().nullable(),
+  countryCode: z.string().nullable(),
+  lastReportedAt: z.string().datetime().nullable(),
+  checkedAt: z.string().datetime(),
+});
+export type IpReputation = z.infer<typeof IpReputation>;
+
 export const Summarizer = z.enum(['llm', 'template']);
 export type Summarizer = z.infer<typeof Summarizer>;
 
