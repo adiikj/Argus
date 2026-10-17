@@ -17,6 +17,15 @@ const RULE_KEYWORDS: Record<string, RuleId> = {
   anomaly: 'traffic-anomaly',
   'dir enum': 'dir-enumeration',
   enumeration: 'dir-enumeration',
+  spray: 'password-spraying',
+  takeover: 'login-after-brute-force',
+  compromise: 'login-after-brute-force',
+  traversal: 'path-traversal',
+  xss: 'xss-attempt',
+  'cross-site': 'xss-attempt',
+  'command injection': 'command-injection',
+  rce: 'command-injection',
+  scanner: 'scanner-user-agent',
 };
 
 const SEVERITY_WORDS: Severity[] = ['critical', 'high', 'medium', 'low', 'info'];

@@ -50,7 +50,17 @@ log.info({ port: config.GENERATOR_PORT, scenarios: SCENARIO_NAMES }, 'simulator 
 // the lazy path: a scripted timeline shortly after boot, so an unattended
 // `docker compose up` still shows alerts/incidents within ~30s (§15).
 if (config.DEMO_MODE) {
-  const timeline = ['brute-force', 'dir-enum', 'sqli', 'rate-abuse', 'invalid-jwt'];
+  const timeline = [
+    'dir-enum',
+    'sqli',
+    'path-traversal',
+    'xss',
+    'command-injection',
+    'password-spray',
+    'account-takeover',
+    'rate-abuse',
+    'invalid-jwt',
+  ];
   void (async () => {
     await sleep(8_000);
     for (const scenario of timeline) {

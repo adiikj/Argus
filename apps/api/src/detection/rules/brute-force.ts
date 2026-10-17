@@ -12,7 +12,14 @@ export const bruteForceRule: StatefulRule = {
   evaluate: async (event, ctx) => {
     if (event.source !== 'auth' || event.outcome !== 'failure') return undefined;
 
-    const entries = await ctx.window.record(event.sourceIp, event.eventId, WINDOW_MS);
+    // keyed per IP *and* account: repeated guesses at one account is password
+    // guessing (T1110.001); one IP failing across many accounts is password
+    // spraying (T1110.003) — that's password-spraying.ts, not this rule
+    const entries = await ctx.window.record(
+      `${event.sourceIp}|${event.username ?? ''}`,
+      event.eventId,
+      WINDOW_MS,
+    );
     if (entries.length < THRESHOLD) return undefined;
 
     return {
@@ -20,7 +27,7 @@ export const bruteForceRule: StatefulRule = {
       severity: 'high',
       entity: event.sourceIp,
       eventIds: entries.map((entry) => entry.eventId),
-      message: `${entries.length} failed SSH logins from ${event.sourceIp} in the last ${WINDOW_MS / 1000}s`,
+      message: `${entries.length} failed SSH logins for ${event.username ?? 'an unknown user'} from ${event.sourceIp} in the last ${WINDOW_MS / 1000}s`,
       count: entries.length,
     };
   },

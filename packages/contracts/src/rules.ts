@@ -33,6 +33,7 @@ const TACTIC = {
   reconnaissance: { id: 'TA0043', name: 'Reconnaissance' },
   initialAccess: { id: 'TA0001', name: 'Initial Access' },
   credentialAccess: { id: 'TA0006', name: 'Credential Access' },
+  execution: { id: 'TA0002', name: 'Execution' },
   defenseEvasion: { id: 'TA0005', name: 'Defense Evasion' },
   impact: { id: 'TA0040', name: 'Impact' },
 } as const satisfies Record<string, MitreRef>;
@@ -52,6 +53,21 @@ export const RULE_CATALOG = {
       'Rate-limit or block the source at the edge',
     ],
     scenario: 'dir-enum',
+  },
+  'scanner-user-agent': {
+    id: 'scanner-user-agent',
+    name: 'Attack tool fingerprint',
+    detects:
+      'A User-Agent naming offensive tooling (sqlmap, nikto, nuclei, gobuster, ffuf, …) — once per tool per source per 10 min.',
+    severity: 'low',
+    stage: 'recon',
+    tactic: TACTIC.reconnaissance,
+    technique: { id: 'T1595.002', name: 'Active Scanning: Vulnerability Scanning' },
+    response: [
+      'Expect exploitation attempts from this source next — correlate its other alerts',
+      'Block the source; tool User-Agents are trivially changed, so do not rely on UA filtering alone',
+    ],
+    scenario: 'sqli',
   },
   'traffic-anomaly': {
     id: 'traffic-anomaly',
@@ -81,6 +97,37 @@ export const RULE_CATALOG = {
     ],
     scenario: 'brute-force',
   },
+  'password-spraying': {
+    id: 'password-spraying',
+    name: 'Password spraying',
+    detects: 'Failed logins for ≥ 5 different accounts from one IP within 5 min.',
+    severity: 'high',
+    stage: 'access',
+    tactic: TACTIC.credentialAccess,
+    technique: { id: 'T1110.003', name: 'Brute Force: Password Spraying' },
+    response: [
+      'Block the source; check other sources for the same username list',
+      'Look for any successful login among the targeted accounts',
+      'Enforce MFA and screen passwords against common-password lists',
+    ],
+    scenario: 'password-spray',
+  },
+  'login-after-brute-force': {
+    id: 'login-after-brute-force',
+    name: 'Login after brute force',
+    detects:
+      'A successful login from a source that just failed ≥ 5 times on that account, or sprayed ≥ 5 accounts, within 10 min.',
+    severity: 'critical',
+    stage: 'access',
+    tactic: TACTIC.initialAccess,
+    technique: { id: 'T1078', name: 'Valid Accounts' },
+    response: [
+      'Treat the account as compromised: kill its sessions and reset its credentials',
+      'Review everything the account did after the login',
+      'Block the source IP',
+    ],
+    scenario: 'account-takeover',
+  },
   'sqli-attempt': {
     id: 'sqli-attempt',
     name: 'SQL injection attempt',
@@ -96,6 +143,51 @@ export const RULE_CATALOG = {
       'Block the source; consider a WAF rule for the payload',
     ],
     scenario: 'sqli',
+  },
+  'path-traversal': {
+    id: 'path-traversal',
+    name: 'Path traversal attempt',
+    detects:
+      'A ../ (or ..\\) step in the request path or query after repeated URL-decoding, or an overlong-UTF-8 encoded dot/slash.',
+    severity: 'high',
+    stage: 'access',
+    tactic: TACTIC.initialAccess,
+    technique: { id: 'T1190', name: 'Exploit Public-Facing Application' },
+    response: [
+      'Confirm the endpoint resolves file paths against a fixed base directory',
+      'Check whether any response returned file contents (status 200, unusual size)',
+    ],
+    scenario: 'path-traversal',
+  },
+  'xss-attempt': {
+    id: 'xss-attempt',
+    name: 'Cross-site scripting attempt',
+    detects:
+      '<script>, javascript: URLs, inline event handlers (onerror=, onload=, …) or alert()/document.cookie in the decoded request.',
+    severity: 'medium',
+    stage: 'execution',
+    tactic: TACTIC.execution,
+    technique: { id: 'T1059.007', name: 'Command and Scripting Interpreter: JavaScript' },
+    response: [
+      'Verify the parameter is output-encoded wherever it is rendered',
+      'Check the dashboard CSP blocks inline script execution paths in use',
+    ],
+    scenario: 'xss',
+  },
+  'command-injection': {
+    id: 'command-injection',
+    name: 'OS command injection attempt',
+    detects:
+      'A shell metacharacter (; | && ` $() followed by a command (id, whoami, cat, curl, wget, …), or ${IFS}, in the decoded request.',
+    severity: 'high',
+    stage: 'execution',
+    tactic: TACTIC.execution,
+    technique: { id: 'T1059.004', name: 'Command and Scripting Interpreter: Unix Shell' },
+    response: [
+      'Check whether the endpoint passes input to a shell — use exec with an argument array instead',
+      'Look for outbound connections from the host to addresses in the payload',
+    ],
+    scenario: 'command-injection',
   },
   'invalid-jwt': {
     id: 'invalid-jwt',

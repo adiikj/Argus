@@ -2,10 +2,15 @@
 
 import {
   Bug,
+  Code,
   Fingerprint,
   FolderSearch,
+  FolderTree,
   Gauge,
   KeyRound,
+  Terminal,
+  UserX,
+  Users,
   Zap,
   type LucideIcon,
 } from 'lucide-react';
@@ -22,6 +27,11 @@ const SCENARIO_ICON: Record<string, LucideIcon> = {
   'dir-enum': FolderSearch,
   'rate-abuse': Gauge,
   'invalid-jwt': Fingerprint,
+  'password-spray': Users,
+  'account-takeover': UserX,
+  'path-traversal': FolderTree,
+  xss: Code,
+  'command-injection': Terminal,
 };
 
 export default function SimulatorPage() {

