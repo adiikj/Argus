@@ -1,200 +1,215 @@
 # Argus
 
-> The hundred-eyed watchman — an AI-powered, event-driven security event analysis platform.
+Real-time security event analysis. Logs stream through Kafka, 12 detection rules mapped to MITRE
+ATT&CK catch attacks as they happen, and every incident gets a short written summary of what
+happened and what to do next.
 
-A scenario-driven log generator feeds **Kafka**. A processing monolith normalizes every event
-against a shared **Zod** contract, runs a stateless + stateful **detection engine**, correlates
-alerts into **incidents** (Postgres/Prisma), and asks an **LLM** for a plain-language incident
-summary (with a deterministic template fallback — the whole stack runs with zero API keys). Every
-alert, incident, and summary streams live over **WebSockets** to a real-time dark security-console
-**dashboard** (Next.js), which also ships an interactive **Attack Simulator**, a **Log Explorer**,
-and a **pipeline trace view** that follows one event from raw log to AI summary.
+**[Live demo](https://argus.buzz)** · [About](https://argus.buzz/about)
 
+![The Argus overview screen](apps/dashboard/public/tour/overview.webp)
+
+## What it does
+
+- **Detects** brute force, password spraying, account takeover, SQL injection, XSS, command
+  injection, path traversal, scanning, token abuse and rate abuse.
+- **Correlates** alerts into one incident per source, and throttles repeats so a noisy scanner stays
+  readable.
+- **Explains** each incident with an LLM summary, or a deterministic template when no API key is
+  set.
+- **Enriches** public IPs with GeoIP and AbuseIPDB reputation.
+- **Ingests real traffic.** Internet scanners probing the live server become real incidents next to
+  the simulated ones.
+- **Streams** everything to the console over WebSockets: live alerts, incident triage, log search,
+  a per-event pipeline trace, ATT&CK coverage and an attack simulator.
+
+![An incident with its summary, kill chain and threat intel](apps/dashboard/public/tour/incident.webp)
 
 ## Architecture
 
 ```mermaid
 graph LR
-    subgraph GEN["Generator (separate service)"]
-        SCN["scenario engine<br/>+ /simulate API"]
+    subgraph GEN["Generator"]
+        SCN["scenarios<br/>+ /simulate API"]
+        TAIL["nginx probe log tail"]
     end
 
     K1[["Kafka: raw.logs"]]
 
-    subgraph API["apps/api (processing monolith)"]
+    subgraph API["apps/api"]
         PARSER["Parser<br/>Zod validate + normalize"]
         K2[["Kafka: events.normalized"]]
         STORAGE["Storage consumer"]
-        DETECT["Detection consumer<br/>stateless + stateful rules"]
+        DETECT["Detection<br/>stateless + windowed rules"]
         K3[["Kafka: alerts"]]
-        INCIDENT["Incident engine<br/>correlate by entity + window"]
+        INCIDENT["Incident engine<br/>correlate + throttle"]
         BUS(("internal bus"))
-        AI["AI engine<br/>LLMProvider or template"]
-        REALTIME["Realtime<br/>WS fan-out + REST"]
+        ENRICH["GeoIP + AbuseIPDB"]
+        AI["Summaries<br/>LLM or template"]
+        REALTIME["Realtime<br/>WebSocket + REST"]
     end
 
-    ES[(Elasticsearch<br/>normalized-events)]
-    PG[(Postgres<br/>alerts / incidents / summaries)]
-    DASH["Dashboard (Next.js)<br/>Overview - Alerts - Incident Details<br/>Log Explorer - Attack Simulator"]
+    STORE[(Event store<br/>Elasticsearch or Postgres FTS)]
+    PG[(Postgres<br/>alerts, incidents, summaries)]
+    DASH["Dashboard (Next.js)"]
 
-    SCN -->|raw log, eventId| K1
+    SCN --> K1
+    TAIL --> K1
     K1 --> PARSER
-    PARSER -->|NormalizedEvent| K2
+    PARSER --> K2
     K2 --> STORAGE
     K2 --> DETECT
-    STORAGE -->|index| ES
-    DETECT -->|Alert| K3
+    STORAGE --> STORE
+    DETECT --> K3
     K3 --> INCIDENT
-    INCIDENT -->|alerts, incidents| PG
-    INCIDENT -->|incident.created / .updated| BUS
-    BUS --> AI
-    AI -->|summary| PG
-    AI -->|summary.ready| BUS
+    INCIDENT --> PG
+    INCIDENT --> BUS
+    BUS --> ENRICH
+    ENRICH --> AI
+    AI --> PG
     BUS --> REALTIME
-    REALTIME -->|WS: incident + summary events| DASH
-    REALTIME -->|REST: /incidents/:id, /events, /events/:id/trace| DASH
-    ES -.->|search, trace lookups| REALTIME
-    PG -.->|incident detail, trace lookups| REALTIME
+    REALTIME --> DASH
+    STORE -.-> REALTIME
+    PG -.-> REALTIME
 ```
+
+Every event carries one id from the raw log to the incident, so the console can trace any event
+through each stage. All message shapes live in one Zod contract package shared by every service.
 
 ## Detection coverage
 
-12 rules mapped to 11 MITRE ATT&CK techniques across 6 tactics. The mapping lives in one place,
-`packages/contracts/src/rules.ts`, which drives the dashboard's ATT&CK badges, the kill-chain view,
-the **Detection Coverage** page, and the AI summaries. Every rule has unit tests, including benign
-look-alikes that must not fire. An end-to-end test runs every simulator scenario through the real
-parser and engine to prove it trips its rule, and runs benign background traffic to prove it trips
-nothing. Injection rules decode payloads repeatedly and leniently, so double encoding and a junk
-`%zz` escape don't get a payload past them.
+12 rules, 11 techniques, 6 tactics. The mapping lives in
+[`packages/contracts/src/rules.ts`](packages/contracts/src/rules.ts) and drives the console's
+ATT&CK badges, the kill-chain view, the coverage page and the summaries.
 
-| Stage | Rule | Detects | Severity | MITRE ATT&CK technique | Tactic |
-|---|---|---|---|---|---|
-| Recon | `dir-enumeration` | Sensitive path enumeration | medium | [T1595.003](https://attack.mitre.org/techniques/T1595/003/) Active Scanning: Wordlist Scanning | Reconnaissance |
-| Recon | `scanner-user-agent` | Attack tool fingerprint | low | [T1595.002](https://attack.mitre.org/techniques/T1595/002/) Active Scanning: Vulnerability Scanning | Reconnaissance |
-| Recon | `traffic-anomaly` | Traffic anomaly | medium | [T1595](https://attack.mitre.org/techniques/T1595/) Active Scanning | Reconnaissance |
-| Access | `brute-force-ssh` | SSH brute force | high | [T1110.001](https://attack.mitre.org/techniques/T1110/001/) Brute Force: Password Guessing | Credential Access |
-| Access | `password-spraying` | Password spraying | high | [T1110.003](https://attack.mitre.org/techniques/T1110/003/) Brute Force: Password Spraying | Credential Access |
-| Access | `login-after-brute-force` | Login after brute force | critical | [T1078](https://attack.mitre.org/techniques/T1078/) Valid Accounts | Initial Access |
-| Access | `sqli-attempt` | SQL injection attempt | high | [T1190](https://attack.mitre.org/techniques/T1190/) Exploit Public-Facing Application | Initial Access |
-| Access | `path-traversal` | Path traversal attempt | high | [T1190](https://attack.mitre.org/techniques/T1190/) Exploit Public-Facing Application | Initial Access |
-| Access | `invalid-jwt` | Invalid token use | low | [T1550.001](https://attack.mitre.org/techniques/T1550/001/) Use Alternate Authentication Material: Application Access Token | Defense Evasion |
-| Execution | `xss-attempt` | Cross-site scripting attempt | medium | [T1059.007](https://attack.mitre.org/techniques/T1059/007/) Command and Scripting Interpreter: JavaScript | Execution |
-| Execution | `command-injection` | OS command injection attempt | high | [T1059.004](https://attack.mitre.org/techniques/T1059/004/) Command and Scripting Interpreter: Unix Shell | Execution |
-| Impact | `api-rate-abuse` | API rate abuse | medium | [T1499.003](https://attack.mitre.org/techniques/T1499/003/) Endpoint Denial of Service: Application Exhaustion Flood | Impact |
+| Rule | Detects | Severity | Technique | Tactic |
+|---|---|---|---|---|
+| `dir-enumeration` | Sensitive path enumeration | medium | [T1595.003](https://attack.mitre.org/techniques/T1595/003/) Wordlist Scanning | Reconnaissance |
+| `scanner-user-agent` | Attack tool fingerprint | low | [T1595.002](https://attack.mitre.org/techniques/T1595/002/) Vulnerability Scanning | Reconnaissance |
+| `traffic-anomaly` | Traffic anomaly | medium | [T1595](https://attack.mitre.org/techniques/T1595/) Active Scanning | Reconnaissance |
+| `brute-force-ssh` | SSH brute force | high | [T1110.001](https://attack.mitre.org/techniques/T1110/001/) Password Guessing | Credential Access |
+| `password-spraying` | Password spraying | high | [T1110.003](https://attack.mitre.org/techniques/T1110/003/) Password Spraying | Credential Access |
+| `login-after-brute-force` | Login after brute force | critical | [T1078](https://attack.mitre.org/techniques/T1078/) Valid Accounts | Initial Access |
+| `sqli-attempt` | SQL injection attempt | high | [T1190](https://attack.mitre.org/techniques/T1190/) Exploit Public-Facing Application | Initial Access |
+| `path-traversal` | Path traversal attempt | high | [T1190](https://attack.mitre.org/techniques/T1190/) Exploit Public-Facing Application | Initial Access |
+| `invalid-jwt` | Invalid token use | low | [T1550.001](https://attack.mitre.org/techniques/T1550/001/) Application Access Token | Defense Evasion |
+| `xss-attempt` | Cross-site scripting attempt | medium | [T1059.007](https://attack.mitre.org/techniques/T1059/007/) JavaScript | Execution |
+| `command-injection` | OS command injection attempt | high | [T1059.004](https://attack.mitre.org/techniques/T1059/004/) Unix Shell | Execution |
+| `api-rate-abuse` | API rate abuse | medium | [T1499.003](https://attack.mitre.org/techniques/T1499/003/) Application Exhaustion Flood | Impact |
+
+Each rule is unit tested, including benign look-alikes that must not fire. An end-to-end test runs
+every simulator scenario through the real parser and engine to prove it trips its rule, and runs
+benign background traffic to prove it trips nothing. Injection rules decode payloads repeatedly and
+leniently, so double encoding or a malformed `%zz` escape doesn't slip a payload past them.
 
 ## Real attack traffic
 
-The deployed instance doesn't run on simulated data alone. nginx in front of the public api writes
-a second access log containing **only requests for paths the api doesn't serve** (`/.env`,
-`/wp-login.php`, `/cgi-bin/…`). Real dashboard users never appear in it; internet scanners and exploit
-kits do. The generator tails that log into Kafka next to the synthetic traffic. It follows logrotate
-and caps throughput per source and overall. From there it goes through the same parser, rules,
-incidents and AI summaries. The engine **throttles alerts** to one per rule and source per minute
-(the next one reports how many it stood in for), so a scanner sending thousands of requests stays a
-readable incident.
+nginx in front of the public API writes a second access log with **only requests for paths the API
+doesn't serve** (`/.env`, `/wp-login.php`, `/cgi-bin/...`). Dashboard users never appear in it, but
+scanners and exploit kits do. The generator tails that log into Kafka, following logrotate and
+capping throughput per source, and from there it goes through the same rules as everything else.
 
-Incidents from real public IPs get **threat-intel enrichment** from AbuseIPDB: abuse confidence,
-report count, ISP and usage type, and Tor exit status. It's shown on the incident page and given to
-the AI summarizer. Lookups are cached in Postgres for a day and capped below the free tier's daily
-quota, and they back off on HTTP 429. Demo and internal IPs are never sent out.
+Alerts are throttled to one per rule and source per minute, and the next alert reports how many it
+stood in for. Public IPs are checked against AbuseIPDB, with lookups cached in Postgres for a day and
+capped below the free tier's quota. Demo and internal IPs are never sent out.
 
-## Stack
+## Deployment
 
-Node 24 · TypeScript (strict) · Fastify · Kafka (KRaft) · Elasticsearch · PostgreSQL (Prisma) ·
-Next.js 16 · WebSockets · shadcn/ui · TanStack Query · Recharts · Framer Motion · Docker Compose ·
-pnpm + Turborepo. GeoIP: [DB-IP](https://db-ip.com) IP-to-Country Lite (CC BY 4.0), country
-centroids from Google's DSPL dataset (BSD-3-Clause). The demo's synthetic attackers use IANA
-documentation ranges (TEST-NET), which have no real location, so those pins are drawn as simulated. Redis is optional (`REDIS_URL`) — backs the detection window store + internal bus
-for multi-instance runs; unset, both stay in-process.
+The live instance runs on a small budget:
+
+- **Dashboard** on Vercel.
+- **Kafka, Redis, the API and the generator** on a 4 GB Azure VM shared with other services. Every
+  container has a hard memory cap, and host nginx terminates TLS.
+- **Postgres** on Azure Database for PostgreSQL. The VM uses the `lite` storage profile, which
+  searches events with Postgres full-text search instead of running Elasticsearch.
+- **Images** are built, scanned and pushed to GHCR by CI. The VM only pulls them. The API image
+  ships the monthly DB-IP GeoIP database.
+
+[`deploy/vm.sh`](deploy/vm.sh) handles the VM side: secret generation, preflight checks, the nginx
+site, probe logging, deploys, backups, rollbacks and end-to-end verification.
+
+## Security
+
+- **Accounts and roles.** Admin, analyst and viewer, carried in a signed session and enforced on
+  every request. Public deployments have no self sign-up; accounts are created from the CLI.
+- **Rate limits** on every endpoint, with a tighter limiter on login. Behind a proxy, `TRUST_PROXY`
+  keys them on the real client IP, so a forged `X-Forwarded-For` can't dodge them.
+- **Transport.** TLS, HSTS and a strict CSP on the dashboard.
+- **Supply chain.** CodeQL, gitleaks over the full history, and Trivy on dependencies and
+  Dockerfiles, with a CycloneDX SBOM.
+- **Runtime.** Scanned images, non-root containers.
+
+## Running locally
+
+Needs Node 24 (see `.nvmrc`), pnpm 10 (`corepack enable`) and Docker.
+
+```bash
+pnpm install
+pnpm env:init                         # creates .env with a fresh AUTH_SECRET
+pnpm infra:up                         # Kafka, Elasticsearch, Postgres, Redis
+pnpm --filter @argus/api db:migrate
+pnpm dev                              # generator, api and dashboard
+```
+
+Open http://localhost:3000. Background traffic starts right away. Fire a scenario from the Attack
+Simulator page, or with `POST http://localhost:4200/simulate/:scenario`, and watch it become an
+alert, an incident and a summary.
+
+Locally, the first account registered at `/login` becomes admin. For a public instance, set
+`ALLOW_REGISTRATION=false` and create accounts with:
+
+```bash
+pnpm --filter @argus/api user:create --email you@example.com --role admin
+```
+
+### Optional integrations
+
+Everything runs with no API keys. Each of these adds one thing:
+
+| Variable | Adds |
+|---|---|
+| `LLM_PROVIDER` + `GROQ_API_KEY` or `GEMINI_API_KEY` | LLM-written summaries instead of templates |
+| `ABUSEIPDB_API_KEY` | IP reputation on incidents |
+| `GEOIP_DB` | Map locations for real IPs (path to a DB-IP `.mmdb`) |
+| `SLACK_WEBHOOK_URL` | Incident notifications |
+| `GOOGLE_CLIENT_ID` + `NEXT_PUBLIC_GOOGLE_CLIENT_ID` | Sign in with Google |
+| `NEXT_PUBLIC_DEMO_EMAIL` + `NEXT_PUBLIC_DEMO_PASSWORD` | A read-only demo button on the login page |
+| `REDIS_URL` | Shared rule state and event bus across instances |
+| `STORAGE_PROFILE=lite` | Postgres full-text search instead of Elasticsearch |
+| `EVENT_RETENTION_DAYS` | How long raw events are kept |
+
+### Commands
+
+```bash
+pnpm typecheck      # tsc across the workspace
+pnpm lint           # eslint
+pnpm test           # vitest
+pnpm test:smoke     # Kafka to parser to store, against running infra
+pnpm infra:down     # stop infra (infra:reset also wipes volumes)
+```
 
 ## Repository layout
 
 ```
 apps/
-  generator/    # scenario-driven log emitter -> Kafka, + the /simulate attack-trigger API
-  api/          # processing monolith: streaming, parser, storage, detection, incident, ai, realtime
-  dashboard/    # Next.js real-time dashboard (Overview, Alerts, Incident Details, Log Explorer, Attack Simulator)
+  generator/    scenario log emitter, probe log tail, /simulate API
+  api/          parser, storage, detection, incidents, enrichment, summaries, realtime
+  dashboard/    Next.js landing page and console
 packages/
-  contracts/    # Zod schemas + inferred types — the single source of truth for every event
-  config/       # env parsing + validation (fail-fast at boot)
-  logger/       # pino structured logging + correlation-id helpers
+  contracts/    Zod schemas and the rule catalog shared by every service
+  config/       env parsing, validated at boot
+  logger/       pino structured logging
+deploy/         VM script, nginx config
 ```
 
-## Prerequisites
+## Stack
 
-- Node.js >= 20 (24 recommended — see `.nvmrc`)
-- pnpm 10 (`corepack enable` picks up the pinned version)
-- Docker + Docker Compose
+TypeScript · Node 24 · Fastify · Kafka (KRaft) · PostgreSQL + Prisma · Elasticsearch · Redis ·
+Next.js 16 · TanStack Query · Recharts · Framer Motion · Docker · GitHub Actions · pnpm + Turborepo
 
-## Getting started
+GeoIP data from [DB-IP](https://db-ip.com) IP to Country Lite (CC BY 4.0). Country centroids from
+Google's DSPL dataset (BSD-3-Clause). Simulated attackers use IANA documentation ranges, which have
+no real location, so their map pins are marked as simulated.
 
-```bash
-# 1. Install dependencies
-pnpm install
+---
 
-# 2. Configure environment (creates .env with a freshly generated AUTH_SECRET)
-pnpm env:init
-# On Windows/machines where 5432 or 4000 are already taken, see the comments in .env.example.
-
-# 3. Boot infrastructure (Kafka, Elasticsearch, Postgres)
-pnpm infra:up
-pnpm infra:logs      # follow logs; wait for healthchecks to pass
-
-# 4. Run the Postgres migration (alerts / incidents / summaries)
-pnpm --filter @argus/api db:migrate
-
-# 5. Run everything in dev mode (generator, api, dashboard)
-pnpm dev
-```
-
-Then open the dashboard at **http://localhost:3000** — the landing page links straight into the live
-console. The generator emits low-rate benign background traffic immediately, so the feed is never
-empty; use the **Attack Simulator** page (or `POST http://localhost:4200/simulate/:scenario`) to fire
-one of ten attack scenarios on demand and watch it become an alert, an incident, and an AI summary
-in real time.
-
-
-### Useful commands
-
-```bash
-pnpm typecheck           # tsc across the workspace
-pnpm lint                # eslint
-pnpm format              # prettier --write
-pnpm test                # vitest — parsers, detection rules, window store, scenarios, ai queue
-pnpm test:smoke          # real Kafka -> parse -> store integration check (needs infra + api running)
-pnpm infra:down          # stop infra   |   pnpm infra:reset wipes volumes
-```
-
-### Running with a real LLM
-
-The AI layer runs with **zero API keys** by default (deterministic template summaries). To get real
-LLM-generated summaries, set in `.env`:
-
-```bash
-LLM_PROVIDER=groq            # or "gemini"
-GROQ_API_KEY=...             # or GEMINI_API_KEY
-```
-
-### Auth + rate limiting
-
-Real per-user accounts (email + password, plus optional "Sign in with Google") gate the console —
-`AUTH_SECRET` in `.env` signs sessions and is required. Every account has a role — **admin**,
-**analyst** (triages incidents), or **viewer** (read-only; the api 403s every write) — carried in the
-signed session token and enforced server-side on every request.
-
-- **Local dev** (`ALLOW_REGISTRATION=true`): a fresh install runs fully open until the first account
-  registers at `/login` (it becomes admin), then every route requires a valid session — the same
-  bootstrap pattern self-hosted tools like Grafana/Gitea use.
-- **Public deployments** (`ALLOW_REGISTRATION=false`): no self sign-up, and the gate is on from boot
-  even with zero accounts, so nobody can claim a fresh instance by registering first. Accounts come
-  from the CLI (password via hidden prompt, never argv):
-  `pnpm --filter @argus/api user:create --email you@example.com --role admin`. Set
-  `NEXT_PUBLIC_DEMO_EMAIL`/`NEXT_PUBLIC_DEMO_PASSWORD` to a `viewer` account to put an
-  "Explore the live demo" button on the login page. Set
-`GOOGLE_CLIENT_ID` (api) and `NEXT_PUBLIC_GOOGLE_CLIENT_ID` (dashboard, same value) to enable Google
-sign-in alongside email+password; leave both blank to run email+password only. The generator's
-`/simulate/:scenario` and every api REST endpoint are token-bucket rate limited regardless (login/
-register/Google endpoints get a tighter limiter against brute-forcing; `TRUST_PROXY` — the proxy's
-addresses, e.g. `loopback,uniquelocal` — makes the limiter key on the real client IP behind a
-reverse proxy), so a public demo URL can't be
-scripted into hammering the LLM's free-tier quota or guessing passwords.
+Built by [Aditya Kumar Jha](https://adiikj.dev).
