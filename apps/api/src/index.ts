@@ -46,6 +46,7 @@ import {
 import { selectProvider, startAiEngine, translateQuery } from './ai/index.js';
 import { startWebhookNotifier } from './notifications/index.js';
 import { getSystemHealth } from './system/index.js';
+import { startRetention } from './retention/index.js';
 import { createAuthService, listUsers, type AuthService } from './auth/index.js';
 
 const config = loadConfig();
@@ -251,3 +252,4 @@ const authService = await createAuthService(prisma, {
 await startRealtime(kafka, bus, prisma, eventStore, metrics, authService);
 startAi(prisma, bus, metrics);
 startNotifications(bus);
+startRetention({ eventStore, retentionDays: config.EVENT_RETENTION_DAYS, log });

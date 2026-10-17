@@ -11,7 +11,6 @@ const log = createLogger({ name: 'generator', level: config.LOG_LEVEL });
 
 log.info({ demoMode: config.DEMO_MODE }, 'generator starting');
 
-const NOISE_INTERVAL_MS = 1200; // background benign traffic cadence (§15 layer 1)
 const BURST_STAGGER_MS = 120; // space injected attack logs so the UI streams them
 
 const producer = await createRawLogProducer(config);
@@ -36,7 +35,7 @@ async function runScenario(name: string): Promise<number> {
 // layer 1: always-on benign noise, so the dashboard is never empty
 setInterval(() => {
   emit(benignEvent()).catch((err: unknown) => log.error({ err }, 'failed to emit noise'));
-}, NOISE_INTERVAL_MS);
+}, config.NOISE_INTERVAL_MS); // background benign traffic cadence (§15 layer 1)
 
 // layer 2: the /simulate trigger API
 await createSimulatorServer({

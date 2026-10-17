@@ -83,3 +83,12 @@ export async function searchEvents(
     hit._source ? [NormalizedEvent.parse(hit._source)] : [],
   );
 }
+
+export async function pruneEvents(client: Client, before: Date): Promise<number> {
+  const result = await client.deleteByQuery({
+    index: EVENTS_INDEX,
+    query: { range: { timestamp: { lt: before.toISOString() } } },
+    conflicts: 'proceed', // a doc re-indexed mid-delete just survives until the next run
+  });
+  return result.deleted ?? 0;
+}

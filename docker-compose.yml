@@ -26,6 +26,11 @@ services:
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
       KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'false'
+      # Kafka is a transport here, not the record (Postgres/ES are) — a day of
+      # replay is plenty. Retention only deletes *closed* segments, and at this
+      # traffic a default 1 GB / 7-day segment would never close, so roll hourly.
+      KAFKA_LOG_RETENTION_HOURS: 24
+      KAFKA_LOG_ROLL_HOURS: 1
     volumes:
       - kafka_data:/var/lib/kafka/data
     healthcheck:

@@ -27,6 +27,11 @@ services:
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
       KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'false'
+      # Kafka is a transport here, not the record (Postgres/ES are) — a day of
+      # replay is plenty. Retention only deletes *closed* segments, and at this
+      # traffic a default 1 GB / 7-day segment would never close, so roll hourly.
+      KAFKA_LOG_RETENTION_HOURS: 24
+      KAFKA_LOG_ROLL_HOURS: 1
     volumes:
       - kafka_data:/var/lib/kafka/data
     healthcheck:
@@ -120,6 +125,7 @@ services:
       ES_NODE: http://elasticsearch:9200
       POSTGRES_URL: postgresql://argus:${POSTGRES_PASSWORD:?set a real password in .env.prod}@postgres:5432/argus
       STORAGE_PROFILE: full
+      EVENT_RETENTION_DAYS: ${EVENT_RETENTION_DAYS:-7}
       LLM_PROVIDER: ${LLM_PROVIDER:-none}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       GROQ_API_KEY: ${GROQ_API_KEY:-}
@@ -151,6 +157,7 @@ services:
       GENERATOR_PORT: '4200'
       KAFKA_BROKERS: kafka:19092
       DEMO_MODE: ${DEMO_MODE:-true}
+      NOISE_INTERVAL_MS: ${NOISE_INTERVAL_MS:-3000}
       CORS_ORIGIN: ${CORS_ORIGIN:?set to the dashboard origin(s), comma-separated}
       TRUST_PROXY: ${TRUST_PROXY:-1}
       # generator shares @argus/config's env schema even though it never uses

@@ -50,6 +50,9 @@ const EnvSchema = z.object({
   POSTGRES_URL: z.string().default('postgresql://argus:argus@localhost:5432/argus'),
   ES_NODE: z.string().default('http://localhost:9200'),
   STORAGE_PROFILE: z.enum(['full', 'lite']).default('full'),
+  // normalized events older than this are pruned hourly (0 = keep forever).
+  // Alerts/incidents/summaries are never pruned.
+  EVENT_RETENTION_DAYS: z.coerce.number().int().nonnegative().default(7),
 
   LLM_PROVIDER: z.enum(['none', 'gemini', 'groq']).default('none'),
   GEMINI_API_KEY: z.string().optional(),
@@ -57,6 +60,10 @@ const EnvSchema = z.object({
   // leave blank to use each provider's built-in default model
   GEMINI_MODEL: z.string().optional(),
   GROQ_MODEL: z.string().optional(),
+
+  // generator background-noise cadence: one benign event per interval. ~1.2s
+  // reads as a busy live system locally; 3–5s keeps a small VM's disk + CPU calm.
+  NOISE_INTERVAL_MS: z.coerce.number().int().min(100).default(1200),
 
   DEMO_MODE: z
     .enum(['true', 'false'])

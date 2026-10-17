@@ -6,12 +6,14 @@ import {
   indexEvent,
   getEventById,
   searchEvents,
+  pruneEvents,
   type EventSearchParams,
 } from './events-index.js';
 import {
   indexEventPostgres,
   getEventByIdPostgres,
   searchEventsPostgres,
+  pruneEventsPostgres,
 } from './postgres-events.js';
 
 export { createEsClient } from './es-client.js';
@@ -38,6 +40,8 @@ export interface EventStore {
   index(event: NormalizedEvent): Promise<void>;
   getById(eventId: string): Promise<NormalizedEvent | undefined>;
   search(params?: EventSearchParams): Promise<NormalizedEvent[]>;
+  // deletes events older than `before`; returns how many went (retention.ts)
+  prune(before: Date): Promise<number>;
   checkHealth(): Promise<EventStoreHealth>;
 }
 
@@ -48,6 +52,7 @@ export function createElasticEventStore(client: Client): EventStore {
     index: (event) => indexEvent(client, event),
     getById: (eventId) => getEventById(client, eventId),
     search: (params) => searchEvents(client, params),
+    prune: (before) => pruneEvents(client, before),
     checkHealth: async () => {
       try {
         const health = await client.cluster.health();
@@ -66,6 +71,7 @@ export function createPostgresEventStore(prisma: PrismaClient): EventStore {
     index: (event) => indexEventPostgres(prisma, event),
     getById: (eventId) => getEventByIdPostgres(prisma, eventId),
     search: (params) => searchEventsPostgres(prisma, params),
+    prune: (before) => pruneEventsPostgres(prisma, before),
     checkHealth: async () => {
       try {
         await prisma.$queryRaw`SELECT 1 FROM normalized_events LIMIT 1`;

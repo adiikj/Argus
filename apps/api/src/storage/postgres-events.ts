@@ -87,3 +87,10 @@ export async function searchEventsPostgres(
   );
   return rows.map(eventRowToContract);
 }
+
+export async function pruneEventsPostgres(prisma: PrismaClient, before: Date): Promise<number> {
+  const { count } = await prisma.normalizedEventRow.deleteMany({
+    where: { timestamp: { lt: before } }, // served by the timestamp index
+  });
+  return count;
+}
