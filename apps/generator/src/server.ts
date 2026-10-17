@@ -57,7 +57,7 @@ export async function createSimulatorServer(deps: SimulatorDeps) {
 
   app.post('/simulate/:scenario', async (req, reply) => {
     if (!SIMULATE_LIMITER.tryConsume(req.ip)) {
-      return reply.code(429).send({ error: 'rate limited — try again shortly' });
+      return reply.code(429).send({ error: 'rate limited, try again shortly' });
     }
     const { scenario } = req.params as { scenario: string };
     if (!SCENARIOS[scenario]) {

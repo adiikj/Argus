@@ -86,7 +86,7 @@ export function createGeoLocatorFrom(lookupCountry: CountryLookup | undefined): 
 // budget on a small shared VM. No file -> simulated pins only, logged once.
 export function createGeoLocator(dbPath: string | undefined, log: Logger): GeoLocator {
   if (!dbPath) {
-    log.info('no GEOIP_DB set — real IPs get no map location (simulated demo IPs still do)');
+    log.info('no GEOIP_DB set, real IPs get no map location');
     return createGeoLocatorFrom(undefined);
   }
   try {
@@ -97,7 +97,7 @@ export function createGeoLocator(dbPath: string | undefined, log: Logger): GeoLo
     );
     return createGeoLocatorFrom((ip) => reader.get(ip)?.country?.iso_code);
   } catch (err) {
-    log.warn({ err, dbPath }, 'GeoIP database unreadable — continuing without real lookups');
+    log.warn({ err, dbPath }, 'GeoIP database unreadable, continuing without real lookups');
     return createGeoLocatorFrom(undefined);
   }
 }

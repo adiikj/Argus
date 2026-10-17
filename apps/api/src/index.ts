@@ -202,7 +202,7 @@ function startAi(prisma: PrismaClient, bus: Bus, m: Metrics): void {
 // SLACK_WEBHOOK_URL is set — same "runs with zero keys" degradation as AI/auth.
 function startNotifications(bus: Bus): void {
   if (!config.SLACK_WEBHOOK_URL) {
-    log.info('no SLACK_WEBHOOK_URL set — webhook notifications disabled');
+    log.info('no SLACK_WEBHOOK_URL set, webhook notifications disabled');
     return;
   }
   startWebhookNotifier(
@@ -222,7 +222,7 @@ const prisma = createPrismaClient(config);
 const intel = createThreatIntel({ prisma, apiKey: config.ABUSEIPDB_API_KEY, log });
 log.info(
   { threatIntel: intel.enabled ? 'abuseipdb' : 'off' },
-  intel.enabled ? 'threat intel enabled' : 'no ABUSEIPDB_API_KEY — threat intel off',
+  intel.enabled ? 'threat intel enabled' : 'no ABUSEIPDB_API_KEY, threat intel off',
 );
 
 // STORAGE_PROFILE=full backs the event store with Elasticsearch (default);

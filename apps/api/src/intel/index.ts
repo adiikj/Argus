@@ -86,7 +86,7 @@ export function createThreatIntel(deps: ThreatIntelDeps): ThreatIntel {
         pausedUntil = result.retryAt;
         deps.log.warn(
           { until: new Date(result.retryAt).toISOString() },
-          'AbuseIPDB quota hit — pausing lookups',
+          'AbuseIPDB quota hit, pausing lookups',
         );
       } else {
         deps.log.warn({ ip, detail: result.detail }, 'AbuseIPDB lookup failed');

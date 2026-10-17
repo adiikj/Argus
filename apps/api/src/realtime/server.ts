@@ -114,14 +114,14 @@ export async function createRealtimeServer(bus: Bus, port: number, opts: Realtim
   app.addHook('onRequest', async (req, reply) => {
     if (req.url.startsWith('/healthz') || req.url.startsWith('/ws')) return;
     if (!REQUEST_LIMITER.tryConsume(req.ip)) {
-      return reply.code(429).send({ error: 'rate limited — try again shortly' });
+      return reply.code(429).send({ error: 'rate limited, try again shortly' });
     }
   });
 
   app.addHook('onRequest', async (req, reply) => {
     if (!RATE_LIMITED_AUTH_PATHS.some((path) => req.url.startsWith(path))) return;
     if (!AUTH_LIMITER.tryConsume(req.ip)) {
-      return reply.code(429).send({ error: 'too many attempts — try again shortly' });
+      return reply.code(429).send({ error: 'too many attempts, try again shortly' });
     }
   });
 

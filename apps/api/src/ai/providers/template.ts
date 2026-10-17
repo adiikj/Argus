@@ -69,7 +69,7 @@ export const templateProvider: LLMProvider = {
       iocs: [incident.correlationKey],
       recommendedActions: [
         reputation && reputation.abuseScore >= 75
-          ? `Block ${incident.correlationKey} at the edge — widely reported as abusive (AbuseIPDB ${reputation.abuseScore}/100)`
+          ? `Block ${incident.correlationKey} at the edge. It is widely reported as abusive (AbuseIPDB ${reputation.abuseScore}/100)`
           : `Investigate activity from ${incident.correlationKey}`,
         ...playbook,
       ],

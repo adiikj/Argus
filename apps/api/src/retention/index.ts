@@ -35,7 +35,7 @@ export async function pruneOnce({
 
 export function startRetention(deps: RetentionDeps): void {
   if (deps.retentionDays <= 0) {
-    deps.log.info('EVENT_RETENTION_DAYS=0 — events are kept forever');
+    deps.log.info('EVENT_RETENTION_DAYS=0, events are kept forever');
     return;
   }
   void pruneOnce(deps);

@@ -58,13 +58,13 @@ export const RULE_CATALOG = {
     id: 'scanner-user-agent',
     name: 'Attack tool fingerprint',
     detects:
-      'A User-Agent naming offensive tooling (sqlmap, nikto, nuclei, gobuster, ffuf, …) — once per tool per source per 10 min.',
+      'A User-Agent naming offensive tooling (sqlmap, nikto, nuclei, gobuster, ffuf). Once per tool per source per 10 min.',
     severity: 'low',
     stage: 'recon',
     tactic: TACTIC.reconnaissance,
     technique: { id: 'T1595.002', name: 'Active Scanning: Vulnerability Scanning' },
     response: [
-      'Expect exploitation attempts from this source next — correlate its other alerts',
+      'Expect exploitation attempts next; check this source’s other alerts',
       'Block the source; tool User-Agents are trivially changed, so do not rely on UA filtering alone',
     ],
     scenario: 'sqli',
@@ -184,7 +184,7 @@ export const RULE_CATALOG = {
     tactic: TACTIC.execution,
     technique: { id: 'T1059.004', name: 'Command and Scripting Interpreter: Unix Shell' },
     response: [
-      'Check whether the endpoint passes input to a shell — use exec with an argument array instead',
+      'Check whether the endpoint passes input to a shell; use exec with an argument array instead',
       'Look for outbound connections from the host to addresses in the payload',
     ],
     scenario: 'command-injection',

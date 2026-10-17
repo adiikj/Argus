@@ -36,7 +36,7 @@ export const KNOWN_RULE_IDS = RULE_IDS;
 // (and cite) in the same vocabulary the dashboard shows
 export function alertLine(alert: Alert): string {
   const info = ruleInfo(alert.ruleId);
-  const mitre = info ? ` (${info.technique.id} ${info.technique.name} — ${info.tactic.name})` : '';
+  const mitre = info ? ` (${info.technique.id} ${info.technique.name}, ${info.tactic.name})` : '';
   return `- [${alert.severity}] ${alert.ruleId}${mitre}: ${alert.message}`;
 }
 
