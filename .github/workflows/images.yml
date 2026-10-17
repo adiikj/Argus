@@ -15,6 +15,9 @@ on:
       - tsconfig.base.json
       - .trivyignore
       - .github/workflows/images.yml
+  # monthly: DB-IP publishes a new GeoIP database at the start of each month
+  schedule:
+    - cron: '17 5 3 * *'
   workflow_dispatch:
 
 permissions:
@@ -50,6 +53,21 @@ jobs:
         # GHCR names must be lowercase; owner names often aren't
         run: echo "name=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/argus-${{ matrix.app }}" >> "$GITHUB_OUTPUT"
 
+      # DB-IP Lite is monthly; early in a month the new file may not be up yet,
+      # so fall back to last month's. Only the api uses it.
+      - name: GeoIP database URL
+        id: geoip
+        if: matrix.app == 'api'
+        run: |
+          for month in "$(date -u +%Y-%m)" "$(date -u -d "$(date -u +%Y-%m-01) -1 day" +%Y-%m)"; do
+            url="https://download.db-ip.com/free/dbip-country-lite-${month}.mmdb.gz"
+            if curl -sfI "$url" >/dev/null; then
+              echo "url=$url" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+          done
+          echo "::warning::no DB-IP database reachable — the image ships without GeoIP"
+
       - uses: docker/setup-buildx-action@v3
 
       # 1) build into the local daemon only — nothing is published yet
@@ -58,6 +76,8 @@ jobs:
         with:
           context: .
           file: apps/${{ matrix.app }}/Dockerfile
+          build-args: |
+            GEOIP_DB_URL=${{ steps.geoip.outputs.url }}
           platforms: linux/amd64 # the deploy VM; add linux/arm64 if it ever changes
           load: true
           tags: ${{ steps.image.outputs.name }}:scan
@@ -87,6 +107,8 @@ jobs:
         with:
           context: .
           file: apps/${{ matrix.app }}/Dockerfile
+          build-args: |
+            GEOIP_DB_URL=${{ steps.geoip.outputs.url }}
           platforms: linux/amd64
           push: true
           tags: |

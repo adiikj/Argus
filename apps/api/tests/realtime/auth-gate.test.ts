@@ -136,3 +136,32 @@ describe('clampLimit', () => {
     expect(clampLimit('abc')).toBeUndefined();
   });
 });
+
+describe('GET /incidents geo enrichment', () => {
+  it('attaches each incident source location from the locator', async () => {
+    const row = (ip: string) => ({
+      incident: { incidentId: ip, correlationKey: ip } as never,
+      latestAlert: {} as never,
+    });
+    const app = await createRealtimeServer(createBus(), 0, {
+      auth: stubAuth({ required: false, registrationOpen: true }),
+      getRecentActivity: async () => ({
+        incidents: [row('203.0.113.5'), row('10.0.0.1')],
+        ruleCounts: {},
+        hourlyActivity: Array(24).fill(0),
+      }),
+      locate: (ip) =>
+        ip === '203.0.113.5'
+          ? { country: 'JP', countryName: 'Japan', lat: 1, lng: 2, source: 'simulated' }
+          : null,
+    });
+    const body = (await app.inject({ url: '/incidents' })).json() as {
+      incidents: Array<{ geo: unknown }>;
+    };
+    await app.close();
+    expect(body.incidents.map((r) => r.geo)).toEqual([
+      { country: 'JP', countryName: 'Japan', lat: 1, lng: 2, source: 'simulated' },
+      null,
+    ]);
+  });
+});

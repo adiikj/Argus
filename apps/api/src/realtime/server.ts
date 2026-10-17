@@ -3,6 +3,7 @@ import websocketPlugin, { type WebSocket } from '@fastify/websocket';
 import {
   IncidentPatch,
   type Alert,
+  type GeoPoint,
   type Incident,
   type IncidentQueryResult,
   type IncidentSummary,
@@ -60,6 +61,8 @@ export interface RealtimeOptions {
   corsOrigins?: string[]; // see CORS_ORIGIN in @argus/config
   // see TRUST_PROXY in @argus/config — decides what req.ip (the rate-limit key) is
   trustProxy?: AppConfig['TRUST_PROXY'];
+  // source-IP -> map location for incident rows (apps/api/src/geo)
+  locate?: (ip: string) => GeoPoint | null;
 }
 
 export async function createRealtimeServer(bus: Bus, port: number, opts: RealtimeOptions) {
@@ -200,7 +203,14 @@ export async function createRealtimeServer(bus: Bus, port: number, opts: Realtim
       ruleCounts: {},
       hourlyActivity: Array(24).fill(0),
     };
-    return (await opts.getRecentActivity?.()) ?? empty;
+    const activity = (await opts.getRecentActivity?.()) ?? empty;
+    return {
+      ...activity,
+      incidents: activity.incidents.map((row) => ({
+        ...row,
+        geo: opts.locate?.(row.incident.correlationKey) ?? null,
+      })),
+    };
   });
 
   app.get('/incidents/:id', async (req, reply) => {
@@ -276,7 +286,7 @@ export async function createRealtimeServer(bus: Bus, port: number, opts: Realtim
 
   const broadcastIncident =
     (type: 'incident.created' | 'incident.updated') => (event: IncidentEvent) =>
-      send({ type, ...event });
+      send({ type, ...event, geo: opts.locate?.(event.incident.correlationKey) ?? null });
   bus.on('incident.created', broadcastIncident('incident.created'));
   bus.on('incident.updated', broadcastIncident('incident.updated'));
   bus.on('incident.status_changed', ({ incident }) =>

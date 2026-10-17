@@ -47,6 +47,7 @@ import { selectProvider, startAiEngine, translateQuery } from './ai/index.js';
 import { startWebhookNotifier } from './notifications/index.js';
 import { getSystemHealth } from './system/index.js';
 import { startRetention } from './retention/index.js';
+import { createGeoLocator } from './geo/index.js';
 import { createAuthService, listUsers, type AuthService } from './auth/index.js';
 
 const config = loadConfig();
@@ -172,6 +173,7 @@ async function startRealtime(
     auth,
     corsOrigins: config.CORS_ORIGIN,
     trustProxy: config.TRUST_PROXY,
+    locate: (ip) => geo.locate(ip),
   });
   log.info({ port: config.PORT }, 'realtime WS + REST (incidents, events, trace) listening');
 }
@@ -199,6 +201,8 @@ function startNotifications(bus: Bus): void {
   );
   log.info('webhook notifier started');
 }
+
+const geo = createGeoLocator(config.GEOIP_DB, log);
 
 const kafka = createKafkaClient(config);
 await ensureTopics(kafka);

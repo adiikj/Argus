@@ -115,11 +115,27 @@ export const IncidentQueryResult = z.object({
 });
 export type IncidentQueryResult = z.infer<typeof IncidentQueryResult>;
 
+// where an incident's source IP is. 'dbip' = a real GeoIP lookup (country
+// level, pinned at the country's centroid); 'simulated' = a synthetic demo
+// address from a documentation range (TEST-NET, 2001:db8::/32), which has no
+// real location — placed deterministically and labeled as simulated in the UI
+export const GeoPoint = z.object({
+  country: z.string().length(2),
+  countryName: z.string(),
+  city: z.string().optional(),
+  lat: z.number(),
+  lng: z.number(),
+  source: z.enum(['dbip', 'simulated']),
+});
+export type GeoPoint = z.infer<typeof GeoPoint>;
+
 // GET /incidents — recent-incidents backfill so a freshly opened dashboard
 // tab isn't empty until new events happen to arrive live over the socket.
+// geo: the source IP's location (null for a private/unlocatable address).
 export const IncidentRow = z.object({
   incident: Incident,
   latestAlert: Alert,
+  geo: GeoPoint.nullable().optional(),
 });
 export type IncidentRow = z.infer<typeof IncidentRow>;
 

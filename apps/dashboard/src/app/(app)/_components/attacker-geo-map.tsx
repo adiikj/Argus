@@ -2,10 +2,15 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { SEVERITY_RANK, type Severity } from '@argus/contracts';
+import type { GeoPoint, Severity } from '@argus/contracts';
 import { useRealtime, type IncidentRow } from '@/lib/realtime';
-import { geoForIp, type GeoPoint } from '@/lib/geo';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { cn } from '@/lib/utils';
+
+// local ordering instead of @argus/contracts' SEVERITY_RANK: importing a value
+// from the contracts entry pulls all of Zod into the browser bundle
+const SEVERITY_ORDER: Severity[] = ['info', 'low', 'medium', 'high', 'critical'];
+const rank = (s: Severity): number => SEVERITY_ORDER.indexOf(s);
 
 const MERIDIANS = [-150, -120, -90, -60, -30, 0, 30, 60, 90, 120, 150];
 const PARALLELS = [-60, -30, 0, 30, 60];
@@ -40,6 +45,10 @@ interface Arc {
   color: string;
 }
 
+function pinKey(geo: GeoPoint): string {
+  return `${geo.source}:${geo.country}:${geo.city ?? ''}`;
+}
+
 function arcPath(from: { x: number; y: number }, to: { x: number; y: number }): string {
   const mx = (from.x + to.x) / 2;
   const my = (from.y + to.y) / 2 - Math.min(20, Math.abs(to.x - from.x) * 0.25 + 6);
@@ -70,14 +79,16 @@ export function AttackerGeoMap() {
 
     // recompute the aggregate pins from the full current list every time —
     // cheap at this scale and keeps counts/severity always in sync.
+    // locations come resolved from the api (apps/api/src/geo); rows without
+    // one (private / unknown addresses) simply get no pin
     const byCity = new Map<string, Pin>();
-    for (const { incident } of incidents) {
-      const geo = geoForIp(incident.correlationKey);
-      const key = `${geo.city}-${geo.country}`;
+    for (const { incident, geo } of incidents) {
+      if (!geo) continue;
+      const key = pinKey(geo);
       const existing = byCity.get(key);
       if (existing) {
         existing.count += 1;
-        if (SEVERITY_RANK[incident.severity] > SEVERITY_RANK[existing.severity]) {
+        if (rank(incident.severity) > rank(existing.severity)) {
           existing.severity = incident.severity;
         }
       } else {
@@ -90,14 +101,17 @@ export function AttackerGeoMap() {
     // arc — otherwise the 50-incident history backfill would fire a burst of
     // arcs the instant the page loads.
     if (newRows.length > 0) {
-      const spawned = newRows.map((row) => {
-        const geo = geoForIp(row.incident.correlationKey);
-        return {
-          id: `${row.incident.incidentId}-${Date.now()}`,
-          from: project(geo.lat, geo.lng),
-          color: SEVERITY_VAR[row.incident.severity],
-        };
-      });
+      const spawned = newRows.flatMap((row) =>
+        row.geo
+          ? [
+              {
+                id: `${row.incident.incidentId}-${Date.now()}`,
+                from: project(row.geo.lat, row.geo.lng),
+                color: SEVERITY_VAR[row.incident.severity],
+              },
+            ]
+          : [],
+      );
       setArcs((prev) => [...prev, ...spawned].slice(-MAX_ARCS));
       setPulse((p) => p + 1);
       for (const arc of spawned) {
@@ -110,12 +124,18 @@ export function AttackerGeoMap() {
 
   const maxCount = Math.max(1, ...pins.map((p) => p.count));
   const target = project(TARGET.lat, TARGET.lng);
+  const realPins = pins.filter((p) => p.source === 'dbip').length;
+  const simulatedPins = pins.length - realPins;
 
   return (
     <Card>
       <CardHeader>
         <CardTitle>Attacker origins</CardTitle>
-        <CardDescription>Simulated from demo traffic — not real geolocation.</CardDescription>
+        <CardDescription>
+          {pins.length === 0
+            ? 'Where incidents originate.'
+            : `${realPins} real (GeoIP, country level) · ${simulatedPins} simulated (demo traffic from documentation IP ranges)`}
+        </CardDescription>
       </CardHeader>
       <CardContent>
         {pins.length === 0 ? (
@@ -183,17 +203,23 @@ export function AttackerGeoMap() {
               const size = 6 + (pin.count / maxCount) * 10;
               return (
                 <div
-                  key={`${pin.city}-${pin.country}`}
+                  key={pinKey(pin)}
                   className="absolute -translate-x-1/2 -translate-y-1/2"
                   style={{ left: `${x}%`, top: `${y}%` }}
-                  title={`${pin.city}, ${pin.country} — ${pin.count} incident${pin.count === 1 ? '' : 's'} (${pin.severity})`}
+                  title={`${pin.city ? `${pin.city}, ` : ''}${pin.countryName}${pin.source === 'simulated' ? ' (simulated)' : ''} — ${pin.count} incident${pin.count === 1 ? '' : 's'} (${pin.severity})`}
                 >
+                  {/* real lookups solid, simulated demo pins hollow */}
                   <span
-                    className="block animate-pulse rounded-full"
+                    className={cn(
+                      'block animate-pulse rounded-full',
+                      pin.source === 'simulated' && 'border-2 bg-transparent',
+                    )}
                     style={{
                       width: size,
                       height: size,
-                      backgroundColor: SEVERITY_VAR[pin.severity],
+                      backgroundColor:
+                        pin.source === 'dbip' ? SEVERITY_VAR[pin.severity] : undefined,
+                      borderColor: SEVERITY_VAR[pin.severity],
                       opacity: 0.75,
                     }}
                   />
@@ -202,6 +228,26 @@ export function AttackerGeoMap() {
             })}
           </div>
         )}
+        <div className="mt-2 flex flex-wrap items-center justify-between gap-2 font-mono text-[10px] text-text-secondary">
+          <span className="flex items-center gap-3">
+            <span className="flex items-center gap-1">
+              <span className="inline-block h-2 w-2 rounded-full bg-text-secondary" /> real
+            </span>
+            <span className="flex items-center gap-1">
+              <span className="inline-block h-2 w-2 rounded-full border border-text-secondary" />{' '}
+              simulated
+            </span>
+          </span>
+          {/* DB-IP Lite is CC BY 4.0 — attribution required wherever it's used */}
+          <a
+            href="https://db-ip.com"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hover:text-text-primary"
+          >
+            IP Geolocation by DB-IP
+          </a>
+        </div>
       </CardContent>
     </Card>
   );

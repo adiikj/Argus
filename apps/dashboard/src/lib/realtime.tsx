@@ -4,6 +4,7 @@ import { createContext, useContext, useEffect, useRef, useState, type ReactNode 
 import { useQueryClient } from '@tanstack/react-query';
 import type {
   Alert,
+  GeoPoint,
   Incident,
   IncidentSummary,
   NormalizedEvent,
@@ -17,6 +18,8 @@ export const API_URL = WS_URL.replace(/^ws(s?):\/\//, 'http$1://').replace(/\/ws
 export interface IncidentRow {
   incident: Incident;
   latestAlert: Alert;
+  // source IP location, resolved server-side (null = private / unknown)
+  geo?: GeoPoint | null;
 }
 
 export type PipelineStage = 'parser' | 'detection' | 'incident' | 'ai';
@@ -30,7 +33,12 @@ export interface PipelineActivity {
 }
 
 type WsMessage =
-  | { type: 'incident.created' | 'incident.updated'; incident: Incident; latestAlert: Alert }
+  | {
+      type: 'incident.created' | 'incident.updated';
+      incident: Incident;
+      latestAlert: Alert;
+      geo?: GeoPoint | null;
+    }
   | { type: 'incident.status_changed'; incident: Incident }
   | { type: 'summary.ready'; summary: IncidentSummary }
   | { type: 'event.normalized'; event: NormalizedEvent }
@@ -77,7 +85,11 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
         setIncidents((prev) =>
           prev.length > 0
             ? prev
-            : data.incidents.map(({ incident, latestAlert }) => ({ incident, latestAlert })),
+            : data.incidents.map(({ incident, latestAlert, geo }) => ({
+                incident,
+                latestAlert,
+                geo,
+              })),
         );
         setRuleCounts((prev) => (Object.keys(prev).length > 0 ? prev : data.ruleCounts));
         setHourlyActivity((prev) => (prev.some((n) => n > 0) ? prev : data.hourlyActivity));
@@ -209,7 +221,7 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
             (row) => row.incident.incidentId !== payload.incident.incidentId,
           );
           const next = [
-            { incident: payload.incident, latestAlert: payload.latestAlert },
+            { incident: payload.incident, latestAlert: payload.latestAlert, geo: payload.geo },
             ...withoutPrior,
           ];
           next.sort(

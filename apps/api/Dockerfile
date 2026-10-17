@@ -28,6 +28,17 @@ WORKDIR /app
 COPY --from=pruner /app/out/json/ .
 RUN pnpm install --prod --frozen-lockfile
 
+# GeoIP: DB-IP's free IP-to-Country Lite (CC BY 4.0), ~8 MB. CI passes the
+# current month's URL (.github/workflows/images.yml); a local build without it
+# just ships no database and the api runs with simulated demo pins only.
+FROM base AS geoip
+ARG GEOIP_DB_URL
+RUN mkdir -p /geoip && if [ -n "$GEOIP_DB_URL" ]; then \
+      apk add --no-cache curl >/dev/null && \
+      curl -fsSLo /tmp/db.mmdb.gz "$GEOIP_DB_URL" && \
+      gunzip -c /tmp/db.mmdb.gz > /geoip/dbip-country-lite.mmdb && rm /tmp/db.mmdb.gz; \
+    fi
+
 # workspace packages (@argus/contracts etc.) export raw .ts, run directly via
 # Node's native type-stripping — there's no dist for them to copy, so the
 # runner still needs their pruned source (out/full), just not dev tooling.
@@ -42,6 +53,8 @@ COPY --from=prod-deps /app .
 COPY --from=pruner /app/out/full/ .
 COPY --from=installer /app/apps/api/dist ./apps/api/dist
 COPY --from=installer /app/apps/api/generated ./apps/api/generated
+COPY --from=geoip /geoip ./geoip
+ENV GEOIP_DB=/app/geoip/dbip-country-lite.mmdb
 EXPOSE 4000
 # drop root: the image's files stay root-owned (read-only to the process), and a
 # compromised process can't rewrite its own code or install anything.

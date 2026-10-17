@@ -86,7 +86,9 @@ nothing. Injection rules decode payloads repeatedly and leniently, so double enc
 
 Node 24 · TypeScript (strict) · Fastify · Kafka (KRaft) · Elasticsearch · PostgreSQL (Prisma) ·
 Next.js 16 · WebSockets · shadcn/ui · TanStack Query · Recharts · Framer Motion · Docker Compose ·
-pnpm + Turborepo. Redis is optional (`REDIS_URL`) — backs the detection window store + internal bus
+pnpm + Turborepo. GeoIP: [DB-IP](https://db-ip.com) IP-to-Country Lite (CC BY 4.0), country
+centroids from Google's DSPL dataset (BSD-3-Clause). The demo's synthetic attackers use IANA
+documentation ranges (TEST-NET), which have no real location, so those pins are drawn as simulated. Redis is optional (`REDIS_URL`) — backs the detection window store + internal bus
 for multi-instance runs; unset, both stay in-process.
 
 ## Repository layout

@@ -59,6 +59,9 @@ const EnvSchema = z.object({
   // normalized events older than this are pruned hourly (0 = keep forever).
   // Alerts/incidents/summaries are never pruned.
   EVENT_RETENTION_DAYS: z.coerce.number().int().nonnegative().default(7),
+  // path to DB-IP's IP-to-Country Lite .mmdb (the api image ships one); unset
+  // = real IPs get no map location, simulated demo IPs still do
+  GEOIP_DB: z.string().optional(),
 
   LLM_PROVIDER: z.enum(['none', 'gemini', 'groq']).default('none'),
   GEMINI_API_KEY: z.string().optional(),
