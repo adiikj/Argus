@@ -2,6 +2,7 @@
 # Argus VM operations — a thin wrapper around docker-compose.vm.yml, run from
 # anywhere inside the repo checkout on the VM:
 #
+#   ./deploy/vm.sh init               create .env.vm with freshly generated secrets
 #   ./deploy/vm.sh preflight          check the box + .env.vm before deploying
 #   ./deploy/vm.sh nginx              print the nginx site for API_HOST (pipe to sudo tee)
 #   ./deploy/vm.sh up                 pull images, migrate, start, wait for healthy
@@ -39,6 +40,54 @@ env_get() {
 }
 
 need_env_file() { [[ -f $ENV_FILE ]] || die "$ENV_FILE not found — cp .env.vm.example $ENV_FILE and fill it in"; }
+
+random_hex() { # $1 bytes of CSPRNG output, hex-encoded
+  if command -v openssl >/dev/null 2>&1; then
+    openssl rand -hex "$1"
+  else
+    od -An -tx1 -N"$1" /dev/urandom | tr -d ' \n'
+  fi
+}
+
+# Creates $ENV_FILE from "$ENV_FILE.example" (if missing) and fills every
+# secret that's still empty with fresh random hex. Run it ON the machine that
+# uses the file, so the secrets are never generated or stored anywhere else.
+# Never overwrites a value that's already set: Postgres only applies
+# POSTGRES_PASSWORD when its volume is first created, so changing it later
+# would lock the api out of its own database; a new AUTH_SECRET logs everyone out.
+cmd_init() {
+  local template="$ENV_FILE.example"
+  if [[ ! -f $ENV_FILE ]]; then
+    [[ -f $template ]] || die "no $ENV_FILE and no $template to create it from"
+    (
+      umask 077
+      cp "$template" "$ENV_FILE"
+    )
+    ok "created $ENV_FILE from $template"
+  fi
+  chmod 600 "$ENV_FILE"
+
+  local key bytes generated=0
+  for spec in POSTGRES_PASSWORD:24 AUTH_SECRET:32; do
+    key=${spec%%:*}
+    bytes=${spec##*:}
+    grep -qE "^$key=" "$ENV_FILE" || continue # not used by this env file
+    if [[ -n $(env_get "$key") ]]; then
+      ok "$key already set — kept"
+      continue
+    fi
+    sed -i "s|^$key=.*|$key=$(random_hex "$bytes")|" "$ENV_FILE"
+    ok "$key generated ($((bytes * 8))-bit)"
+    generated=$((generated + 1))
+  done
+
+  local missing=()
+  for key in CORS_ORIGIN API_HOST; do
+    grep -qE "^$key=" "$ENV_FILE" && [[ -z $(env_get "$key") ]] && missing+=("$key")
+  done
+  if ((${#missing[@]} > 0)); then warn "still to fill in by hand: ${missing[*]}"; fi
+  ok "$ENV_FILE ready (mode 600, $generated secret(s) generated)"
+}
 
 port_owner() { # prints the listener on 127.0.0.1/0.0.0.0:$1, if any
   ss -Hltnp "sport = :$1" 2>/dev/null | head -n1
@@ -249,6 +298,7 @@ cmd_verify() {
 }
 
 case ${1:-} in
+  init) cmd_init ;;
   preflight) cmd_preflight ;;
   nginx) cmd_nginx ;;
   up | update) cmd_up ;;
@@ -259,5 +309,5 @@ case ${1:-} in
   rollback) shift && cmd_rollback "$@" ;;
   verify) cmd_verify ;;
   down) need_env_file && "${COMPOSE[@]}" down ;;
-  *) sed -n '2,15p' "$0" | sed 's/^# \{0,1\}//' && exit 1 ;;
+  *) sed -n '2,16p' "$0" | sed 's/^# \{0,1\}//' && exit 1 ;;
 esac

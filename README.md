@@ -89,8 +89,8 @@ packages/
 # 1. Install dependencies
 pnpm install
 
-# 2. Configure environment
-cp .env.example .env
+# 2. Configure environment (creates .env with a freshly generated AUTH_SECRET)
+pnpm env:init
 # On Windows/machines where 5432 or 4000 are already taken, see the comments in .env.example.
 
 # 3. Boot infrastructure (Kafka, Elasticsearch, Postgres)
