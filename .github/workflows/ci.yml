@@ -1,0 +1,93 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# least privilege: CI only needs to read the code
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CHECKPOINT_DISABLE: '1' # no Prisma CLI telemetry
+  # placeholders so @argus/config validates; nothing here is a real secret
+  AUTH_SECRET: ci-only-not-a-secret-0123456789
+
+jobs:
+  quality:
+    name: Lint, typecheck, test
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      POSTGRES_URL: postgresql://ci:ci@localhost:5432/ci # generate only parses it
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v4 # version from package.json "packageManager"
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @argus/api exec prisma generate
+      - run: pnpm format:check
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm test
+
+  migrations:
+    name: Migrations on real Postgres
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: argus
+          POSTGRES_PASSWORD: argus
+          POSTGRES_DB: argus
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U argus -d argus"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      POSTGRES_URL: postgresql://argus:argus@localhost:5432/argus
+      SHADOW_URL: postgresql://argus:argus@localhost:5432/shadow
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @argus/api exec prisma generate
+
+      # exactly what the prod `migrate` service runs, on an empty database
+      - name: Apply migrations to a fresh database
+        run: pnpm --filter @argus/api exec prisma migrate deploy
+
+      # fails if schema.prisma changed without a matching migration (or vice versa)
+      - name: Check schema / migration drift
+        run: |
+          PGPASSWORD=argus psql -h localhost -U argus -d argus -c 'CREATE DATABASE shadow'
+          pnpm --filter @argus/api exec prisma migrate diff \
+            --from-migrations prisma/migrations \
+            --to-schema-datamodel prisma/schema.prisma \
+            --shadow-database-url "$SHADOW_URL" \
+            --exit-code
+
+      - name: Operator CLI creates and updates an account
+        env:
+          ARGUS_USER_PASSWORD: ci-password-123
+        run: |
+          pnpm --filter @argus/api exec tsx src/cli/create-user.ts --email admin@ci.test --role admin
+          pnpm --filter @argus/api exec tsx src/cli/create-user.ts --email admin@ci.test --role viewer
