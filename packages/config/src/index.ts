@@ -7,7 +7,7 @@ import { z } from 'zod';
 // proxy-addr's named ranges (loopback, linklocal, uniquelocal). Decides which
 // X-Forwarded-For entry becomes req.ip — the key every rate limiter uses:
 // Fastify walks XFF from the right and stops at the first untrusted address.
-// Behind nginx/Caddy/cloudflared in Docker: 'loopback,uniquelocal' (the
+// Behind nginx in Docker: 'loopback,uniquelocal' (the
 // private ranges Docker networks live in). 'false' (default) = no proxy.
 //
 // Rejected on purpose:

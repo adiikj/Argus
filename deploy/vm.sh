@@ -122,7 +122,7 @@ cmd_preflight() {
   else
     fail "docker not installed"
   fi
-  if command -v nginx >/dev/null 2>&1; then ok "nginx present"; else warn "nginx not found — use the bundled Caddy (--profile caddy) instead"; fi
+  if command -v nginx >/dev/null 2>&1; then ok "nginx present"; else fail "nginx not found — sudo apt install nginx"; fi
   if command -v certbot >/dev/null 2>&1; then ok "certbot present"; else warn "certbot not found — sudo apt install certbot python3-certbot-nginx"; fi
 
   echo "Env file ($ENV_FILE)"

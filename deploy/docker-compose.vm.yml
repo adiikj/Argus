@@ -5,8 +5,7 @@
 # (.github/workflows/images.yml) — the VM only pulls. Day-to-day: deploy/vm.sh.
 #
 # Nothing here is reachable from outside the VM: Kafka/Redis publish no ports,
-# api/generator bind 127.0.0.1 only. A reverse proxy terminates TLS in front —
-# the bundled Caddy (`--profile caddy`) or the host's existing nginx
+# api/generator bind 127.0.0.1 only. Host nginx terminates TLS in front
 # (deploy/nginx/argus.conf).
 #
 # mem_limits are hard caps (the kernel kills the container, not a neighbour
@@ -175,33 +174,5 @@ services:
     depends_on:
       kafka: { condition: service_healthy }
 
-  # optional TLS-terminating proxy, for a VM with nothing on :80/:443 yet:
-  #   docker compose -f deploy/docker-compose.vm.yml --env-file .env.vm --profile caddy up -d
-  # Already running nginx for other apps? Skip this; use deploy/nginx/argus.conf.
-  caddy:
-    image: caddy:2-alpine
-    container_name: argus-caddy
-    profiles: [caddy]
-    restart: unless-stopped
-    logging: *logging
-    mem_limit: 96m
-    ports:
-      - '80:80'
-      - '443:443'
-    environment:
-      # not `:?`-required: compose can validate these even when the caddy
-      # profile is off, which would break the nginx setup. Set both to use Caddy.
-      API_HOST: ${API_HOST:-}
-      ACME_EMAIL: ${ACME_EMAIL:-}
-    volumes:
-      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
-      - caddy_data:/data
-      - caddy_config:/config
-    depends_on:
-      - api
-      - generator
-
 volumes:
   kafka_data:
-  caddy_data:
-  caddy_config:
