@@ -190,7 +190,7 @@ export function TourProvider({ children }: { children: ReactNode }) {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -12 }}
             transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
-            className="fixed left-1/2 top-4 z-50 flex -translate-x-1/2 items-center gap-3 rounded-lg border border-accent/30 bg-bg-elevated px-4 py-2.5 shadow-2xl shadow-black/40"
+            className="fixed bottom-5 left-1/2 z-50 flex -translate-x-1/2 items-center gap-3 rounded-xl border border-accent/30 bg-bg-elevated/95 px-4 py-2.5 shadow-2xl shadow-black/50 backdrop-blur"
           >
             <Sparkles className="h-4 w-4 shrink-0 text-accent" strokeWidth={1.8} />
             <span className="whitespace-nowrap text-xs text-text-primary">
@@ -242,7 +242,7 @@ function TourHighlight({
         initial={{ opacity: 0, scale: 0.97 }}
         animate={{ opacity: 1, scale: 1 }}
         transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
-        className="pointer-events-none fixed z-[60] rounded-lg border-2 border-accent shadow-[0_0_0_4px_rgba(45,212,191,0.15)]"
+        className="pointer-events-none fixed z-[60] rounded-lg border-2 border-accent shadow-[0_0_0_4px_color-mix(in_srgb,var(--color-accent)_18%,transparent)]"
         style={{
           top: rect.top - 6,
           left: rect.left - 6,

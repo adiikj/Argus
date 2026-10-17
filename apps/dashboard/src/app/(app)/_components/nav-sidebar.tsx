@@ -2,16 +2,20 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { Search, Compass, Tv, Info, LogOut } from 'lucide-react';
+import { Search, Compass, Tv, Info, LogOut, X } from 'lucide-react';
 import { Wordmark } from '../../_components/wordmark';
 import { useRealtime } from '@/lib/realtime';
 import { useTour } from '@/lib/tour';
 import { clearToken } from '@/lib/auth';
-import { NAV_ITEMS } from '@/lib/nav-items';
+import { NAV_SECTIONS } from '@/lib/nav-items';
 import { useCommandPalette } from './command-palette';
 import { cn } from '@/lib/utils';
 
-export function NavSidebar() {
+const ITEM =
+  'group relative flex items-center gap-2.5 rounded-lg px-3 py-2 text-[13px] transition-colors';
+
+// the sidebar body — rendered fixed on desktop and inside the drawer on mobile
+export function NavSidebar({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
   const router = useRouter();
   const { connected } = useRealtime();
@@ -24,92 +28,144 @@ export function NavSidebar() {
   };
 
   return (
-    <aside className="sticky top-0 flex h-screen w-56 shrink-0 flex-col border-r border-border-subtle bg-bg-panel">
-      <div className="border-b border-border-subtle px-4 py-4">
-        <Wordmark />
-      </div>
-
-      <div className="px-3 pt-3">
-        <button
-          type="button"
-          onClick={() => setOpen(true)}
-          className="flex w-full items-center justify-between rounded-md border border-border-subtle bg-bg-elevated px-3 py-1.5 font-mono text-xs text-text-secondary transition-colors hover:border-accent/40 hover:text-text-primary"
-        >
-          <span className="flex items-center gap-1.5">
-            <Search className="h-3.5 w-3.5" strokeWidth={1.8} />
-            Search
-          </span>
-          <span className="rounded border border-border-subtle bg-bg-panel px-1.5 py-0.5 text-[10px]">
-            ⌘K
-          </span>
-        </button>
-
-        <button
-          type="button"
-          onClick={startTour}
-          className="mt-2 flex w-full items-center gap-1.5 rounded-md border border-border-subtle bg-bg-elevated px-3 py-1.5 font-mono text-xs text-text-secondary transition-colors hover:border-accent/40 hover:text-text-primary"
-        >
-          <Compass className="h-3.5 w-3.5" strokeWidth={1.8} />
-          Take the tour
-        </button>
-      </div>
-
-      <nav className="flex flex-1 flex-col gap-1 p-3">
-        {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
-          const active = pathname === href || pathname.startsWith(`${href}/`);
-          return (
-            <Link
-              key={href}
-              href={href}
-              className={cn(
-                'flex items-center gap-2.5 rounded-md px-3 py-2 font-mono text-xs transition-colors',
-                active
-                  ? 'bg-accent/10 text-text-primary'
-                  : 'text-text-secondary hover:bg-bg-elevated hover:text-text-primary',
-              )}
-            >
-              <Icon className={cn('h-4 w-4', active ? 'text-accent' : '')} strokeWidth={1.8} />
-              {label}
-            </Link>
-          );
-        })}
-      </nav>
-
-      <div className="flex flex-col gap-3 border-t border-border-subtle p-3">
-        <div className="flex items-center gap-2 px-3 font-mono text-xs text-text-secondary">
-          <span
-            className={cn(
-              'h-2 w-2 rounded-full',
-              connected ? 'animate-pulse bg-severity-ok' : 'bg-severity-info',
-            )}
-          />
-          {connected ? 'connected' : 'disconnected'}
-        </div>
-        <div className="flex flex-col gap-1">
-          <Link
-            href="/wall"
-            className="flex items-center gap-2.5 rounded-md px-3 py-2 font-mono text-xs text-text-secondary transition-colors hover:bg-bg-elevated hover:text-text-primary"
-          >
-            <Tv className="h-4 w-4" strokeWidth={1.8} />
-            SOC wall
-          </Link>
-          <Link
-            href="/about"
-            className="flex items-center gap-2.5 rounded-md px-3 py-2 font-mono text-xs text-text-secondary transition-colors hover:bg-bg-elevated hover:text-text-primary"
-          >
-            <Info className="h-4 w-4" strokeWidth={1.8} />
-            About this project
-          </Link>
+    <div className="flex h-full flex-col">
+      <div className="flex items-center justify-between px-5 pt-5 pb-4">
+        <Wordmark href="/overview" />
+        {onNavigate && (
           <button
             type="button"
-            onClick={logout}
-            className="flex items-center gap-2.5 rounded-md px-3 py-2 font-mono text-xs text-text-secondary transition-colors hover:bg-severity-critical/10 hover:text-severity-critical"
+            onClick={onNavigate}
+            aria-label="Close menu"
+            className="rounded-md p-1.5 text-text-secondary hover:bg-bg-elevated hover:text-text-primary"
           >
-            <LogOut className="h-4 w-4" strokeWidth={1.8} />
-            Log out
+            <X className="h-4 w-4" />
           </button>
+        )}
+      </div>
+
+      <div className="px-3">
+        <button
+          type="button"
+          onClick={() => {
+            onNavigate?.();
+            setOpen(true);
+          }}
+          className="flex w-full items-center justify-between rounded-lg border border-border-subtle bg-bg-base/60 px-3 py-2 text-[13px] text-text-muted transition-colors hover:border-border-strong hover:text-text-secondary"
+        >
+          <span className="flex items-center gap-2">
+            <Search className="h-3.5 w-3.5" strokeWidth={2} />
+            Search or jump to…
+          </span>
+          <kbd className="rounded border border-border-subtle bg-bg-elevated px-1.5 py-0.5 font-mono text-[10px] text-text-secondary">
+            ⌘K
+          </kbd>
+        </button>
+      </div>
+
+      <nav className="mt-4 flex-1 space-y-5 overflow-y-auto px-3">
+        {NAV_SECTIONS.map((section) => (
+          <div key={section.label}>
+            <p className="mb-1.5 px-3 font-mono text-[10px] font-medium uppercase tracking-[0.16em] text-text-muted">
+              {section.label}
+            </p>
+            <div className="space-y-0.5">
+              {section.items.map(({ href, label, icon: Icon }) => {
+                const active = pathname === href || pathname.startsWith(`${href}/`);
+                return (
+                  <Link
+                    key={href}
+                    href={href}
+                    onClick={onNavigate}
+                    className={cn(
+                      ITEM,
+                      active
+                        ? 'bg-bg-elevated text-text-primary'
+                        : 'text-text-secondary hover:bg-bg-elevated/60 hover:text-text-primary',
+                    )}
+                  >
+                    {active && (
+                      <span className="bg-brand absolute top-1.5 bottom-1.5 left-0 w-[3px] rounded-full" />
+                    )}
+                    <Icon
+                      className={cn(
+                        'h-4 w-4 shrink-0',
+                        active ? 'text-accent' : 'text-text-muted group-hover:text-text-secondary',
+                      )}
+                      strokeWidth={1.9}
+                    />
+                    {label}
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+      </nav>
+
+      <div className="space-y-0.5 border-t border-border-subtle p-3">
+        <button
+          type="button"
+          onClick={() => {
+            onNavigate?.();
+            startTour();
+          }}
+          className={cn(
+            ITEM,
+            'w-full text-text-secondary hover:bg-bg-elevated/60 hover:text-text-primary',
+          )}
+        >
+          <Compass className="h-4 w-4 text-text-muted" strokeWidth={1.9} />
+          Take the tour
+        </button>
+        <Link
+          href="/wall"
+          className={cn(
+            ITEM,
+            'text-text-secondary hover:bg-bg-elevated/60 hover:text-text-primary',
+          )}
+        >
+          <Tv className="h-4 w-4 text-text-muted" strokeWidth={1.9} />
+          SOC wall
+        </Link>
+        <Link
+          href="/about"
+          className={cn(
+            ITEM,
+            'text-text-secondary hover:bg-bg-elevated/60 hover:text-text-primary',
+          )}
+        >
+          <Info className="h-4 w-4 text-text-muted" strokeWidth={1.9} />
+          About Argus
+        </Link>
+        <button
+          type="button"
+          onClick={logout}
+          className={cn(
+            ITEM,
+            'w-full text-text-secondary hover:bg-severity-critical/10 hover:text-severity-critical',
+          )}
+        >
+          <LogOut className="h-4 w-4 text-text-muted" strokeWidth={1.9} />
+          Log out
+        </button>
+
+        <div className="mt-2 flex items-center gap-2 rounded-lg border border-border-subtle bg-bg-base/50 px-3 py-2">
+          <span className="relative flex h-2 w-2">
+            {connected && (
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-severity-ok opacity-60" />
+            )}
+            <span
+              className={cn(
+                'relative inline-flex h-2 w-2 rounded-full',
+                connected ? 'bg-severity-ok' : 'bg-severity-info',
+              )}
+            />
+          </span>
+          <span className="font-mono text-[11px] text-text-secondary">
+            {connected ? 'Live stream connected' : 'Stream disconnected'}
+          </span>
         </div>
       </div>
-    </aside>
+    </div>
   );
 }
