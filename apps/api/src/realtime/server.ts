@@ -30,6 +30,15 @@ const REQUEST_LIMITER = new RateLimiter(40, 5);
 const AUTH_LIMITER = new RateLimiter(5, 0.2);
 const RATE_LIMITED_AUTH_PATHS = ['/auth/login', '/auth/register', '/auth/google'];
 
+// caller-supplied page size, bounded — an unchecked ?limit=10000000 would have
+// one request scan and serialize the whole event store. Junk -> default.
+const MAX_EVENTS_LIMIT = 200;
+export function clampLimit(raw: string | undefined): number | undefined {
+  const n = Number(raw);
+  if (!raw || !Number.isFinite(n) || n < 1) return undefined;
+  return Math.min(Math.floor(n), MAX_EVENTS_LIMIT);
+}
+
 export interface EventTrace {
   eventId: string;
   event: NormalizedEvent | undefined;
@@ -239,8 +248,7 @@ export async function createRealtimeServer(bus: Bus, port: number, opts: Realtim
 
   app.get('/events', async (req) => {
     const { q, source, limit } = req.query as { q?: string; source?: string; limit?: string };
-    const events =
-      (await opts.searchEvents?.({ q, source, limit: limit ? Number(limit) : undefined })) ?? [];
+    const events = (await opts.searchEvents?.({ q, source, limit: clampLimit(limit) })) ?? [];
     return { events };
   });
 

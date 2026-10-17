@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { FastifyInstance } from 'fastify';
 import type { Role } from '@argus/contracts';
 import { createBus } from '../../src/bus/index.js';
-import { createRealtimeServer } from '../../src/realtime/server.js';
+import { clampLimit, createRealtimeServer } from '../../src/realtime/server.js';
 import type { AuthService, RegisterResult } from '../../src/auth/index.js';
 
 // stub auth: tokens are just role names, so each test picks its caller's role
@@ -123,5 +123,16 @@ describe('api CORS + origin checks', () => {
     expect(res.headers['x-content-type-options']).toBe('nosniff');
     expect(res.headers['x-frame-options']).toBe('DENY');
     expect(res.headers['cache-control']).toBe('no-store');
+  });
+});
+
+describe('clampLimit', () => {
+  it('bounds the events page size', () => {
+    expect(clampLimit('25')).toBe(25);
+    expect(clampLimit('10000000')).toBe(200);
+    expect(clampLimit('12.7')).toBe(12);
+    expect(clampLimit(undefined)).toBeUndefined();
+    expect(clampLimit('-5')).toBeUndefined();
+    expect(clampLimit('abc')).toBeUndefined();
   });
 });
