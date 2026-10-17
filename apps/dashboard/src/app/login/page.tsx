@@ -5,10 +5,16 @@ import { useRouter } from 'next/navigation';
 import { API_URL } from '@/lib/realtime';
 import { getToken, setToken } from '@/lib/auth';
 import { useGoogleSignIn, GOOGLE_BUTTON_ELEMENT_ID } from '@/lib/use-google-signin';
+import { useAuthStatus } from '@/lib/use-auth-status';
 import { Button } from '@/components/ui/button';
 import { Wordmark } from '../_components/wordmark';
 
 type Mode = 'login' | 'register';
+
+// optional public read-only account (role viewer) for visitors/recruiters —
+// baked into the bundle on purpose, it can only read. Unset = no demo button.
+const DEMO_EMAIL = process.env.NEXT_PUBLIC_DEMO_EMAIL;
+const DEMO_PASSWORD = process.env.NEXT_PUBLIC_DEMO_PASSWORD;
 
 const INPUT_CLASS =
   'w-full rounded-lg border border-border-subtle bg-bg-base px-3 py-2.5 text-sm text-text-primary placeholder:text-text-secondary/60 transition-colors focus:border-accent/50 focus:outline-none focus:ring-2 focus:ring-accent/15';
@@ -86,6 +92,13 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+  const { data: authStatus } = useAuthStatus();
+  const registrationOpen = authStatus?.registration !== false;
+
+  // sign-up disabled on this instance — pin the form to sign-in
+  useEffect(() => {
+    if (!registrationOpen) setMode('login');
+  }, [registrationOpen]);
 
   const finishLogin = (token: string): void => {
     setToken(token);
@@ -120,28 +133,34 @@ export default function LoginPage() {
     mode === 'register' ? 'signup_with' : 'signin_with',
   );
 
-  const onSubmit = async (e: FormEvent): Promise<void> => {
-    e.preventDefault();
+  const authenticate = async (as: Mode, creds: { email: string; password: string }) => {
     setPending(true);
     setError(null);
     try {
-      const res = await fetch(`${API_URL}/auth/${mode}`, {
+      const res = await fetch(`${API_URL}/auth/${as}`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify(creds),
       });
       if (!res.ok) {
         const body = (await res.json().catch(() => ({}))) as { error?: string };
         setError(
-          body.error ?? (mode === 'login' ? 'Invalid email or password.' : 'Registration failed.'),
+          body.error ?? (as === 'login' ? 'Invalid email or password.' : 'Registration failed.'),
         );
         return;
       }
       const { token } = (await res.json()) as { token: string };
       finishLogin(token);
+    } catch {
+      setError('Could not reach the server.');
     } finally {
       setPending(false);
     }
+  };
+
+  const onSubmit = async (e: FormEvent): Promise<void> => {
+    e.preventDefault();
+    await authenticate(mode, { email, password });
   };
 
   return (
@@ -167,25 +186,27 @@ export default function LoginPage() {
         </div>
 
         <div className="rounded-2xl border border-border-subtle bg-bg-panel p-7 shadow-2xl shadow-black/40">
-          <div className="mb-6 flex items-center gap-1 rounded-lg border border-border-subtle bg-bg-base p-1">
-            {(['login', 'register'] as const).map((m) => (
-              <button
-                key={m}
-                type="button"
-                onClick={() => {
-                  setMode(m);
-                  setError(null);
-                }}
-                className={`flex-1 rounded-md py-1.5 font-mono text-xs uppercase tracking-wider transition-colors ${
-                  mode === m
-                    ? 'bg-accent text-bg-base font-semibold'
-                    : 'text-text-secondary hover:text-text-primary'
-                }`}
-              >
-                {m === 'login' ? 'Sign in' : 'Sign up'}
-              </button>
-            ))}
-          </div>
+          {registrationOpen && (
+            <div className="mb-6 flex items-center gap-1 rounded-lg border border-border-subtle bg-bg-base p-1">
+              {(['login', 'register'] as const).map((m) => (
+                <button
+                  key={m}
+                  type="button"
+                  onClick={() => {
+                    setMode(m);
+                    setError(null);
+                  }}
+                  className={`flex-1 rounded-md py-1.5 font-mono text-xs uppercase tracking-wider transition-colors ${
+                    mode === m
+                      ? 'bg-accent text-bg-base font-semibold'
+                      : 'text-text-secondary hover:text-text-primary'
+                  }`}
+                >
+                  {m === 'login' ? 'Sign in' : 'Sign up'}
+                </button>
+              ))}
+            </div>
+          )}
 
           <p className="mb-5 text-sm text-text-secondary">
             {mode === 'login'
@@ -257,6 +278,31 @@ export default function LoginPage() {
             </Button>
           </form>
 
+          {DEMO_EMAIL && DEMO_PASSWORD && mode === 'login' && (
+            <>
+              <div className="my-5 flex items-center gap-3 font-mono text-[10px] uppercase tracking-wider text-text-secondary">
+                <span className="h-px flex-1 bg-border-subtle" />
+                just looking?
+                <span className="h-px flex-1 bg-border-subtle" />
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="lg"
+                disabled={pending}
+                className="w-full"
+                onClick={() =>
+                  void authenticate('login', { email: DEMO_EMAIL, password: DEMO_PASSWORD })
+                }
+              >
+                Explore the live demo
+              </Button>
+              <p className="mt-2 text-center font-mono text-[10px] text-text-secondary">
+                read-only account — fire attacks from the simulator, watch them land
+              </p>
+            </>
+          )}
+
           {googleEnabled && (
             <>
               <div className="my-5 flex items-center gap-3 font-mono text-[10px] uppercase tracking-wider text-text-secondary">
@@ -269,37 +315,39 @@ export default function LoginPage() {
           )}
         </div>
 
-        <p className="mt-6 text-center font-mono text-xs text-text-secondary">
-          {mode === 'login' ? (
-            <>
-              Don&apos;t have an account?{' '}
-              <button
-                type="button"
-                onClick={() => {
-                  setMode('register');
-                  setError(null);
-                }}
-                className="text-accent hover:underline"
-              >
-                Sign up
-              </button>
-            </>
-          ) : (
-            <>
-              Already have an account?{' '}
-              <button
-                type="button"
-                onClick={() => {
-                  setMode('login');
-                  setError(null);
-                }}
-                className="text-accent hover:underline"
-              >
-                Sign in
-              </button>
-            </>
-          )}
-        </p>
+        {registrationOpen && (
+          <p className="mt-6 text-center font-mono text-xs text-text-secondary">
+            {mode === 'login' ? (
+              <>
+                Don&apos;t have an account?{' '}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMode('register');
+                    setError(null);
+                  }}
+                  className="text-accent hover:underline"
+                >
+                  Sign up
+                </button>
+              </>
+            ) : (
+              <>
+                Already have an account?{' '}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMode('login');
+                    setError(null);
+                  }}
+                  className="text-accent hover:underline"
+                >
+                  Sign in
+                </button>
+              </>
+            )}
+          </p>
+        )}
       </div>
     </main>
   );

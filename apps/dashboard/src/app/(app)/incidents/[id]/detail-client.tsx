@@ -8,6 +8,7 @@ import type { Incident, IncidentStatus } from '@argus/contracts';
 import { useIncidentDetail } from '@/lib/use-incident-detail';
 import { usePatchIncident } from '@/lib/use-incident-mutation';
 import { useUsers } from '@/lib/use-users';
+import { useSessionRole } from '@/lib/use-session-role';
 import { Badge, type BadgeProps } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
@@ -52,6 +53,36 @@ const TRANSITIONS: Record<IncidentStatus, IncidentStatus[]> = {
 
 function needsNote(status: IncidentStatus): boolean {
   return status === 'resolved' || status === 'false_positive';
+}
+
+function ResolutionNote({ note }: { note: string }) {
+  return (
+    <div>
+      <p className="mb-1 font-mono text-[10px] uppercase tracking-wider text-text-secondary">
+        Resolution note
+      </p>
+      <p className="text-sm text-text-secondary">{note}</p>
+    </div>
+  );
+}
+
+// a viewer (the public demo account) can't triage — the api 403s every write,
+// so show why instead of buttons that would only fail.
+function ReadOnlyActions({ incident }: { incident: Incident }) {
+  return (
+    <Card className="mb-6">
+      <CardHeader>
+        <CardTitle>Actions</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <p className="text-sm text-text-secondary">
+          You&apos;re signed in with a read-only account — triage actions (acknowledge, resolve,
+          assign) are disabled.
+        </p>
+        {incident.resolutionNote && <ResolutionNote note={incident.resolutionNote} />}
+      </CardContent>
+    </Card>
+  );
 }
 
 function IncidentActions({ incident }: { incident: Incident }) {
@@ -145,14 +176,7 @@ function IncidentActions({ incident }: { incident: Incident }) {
           </select>
         </div>
 
-        {incident.resolutionNote && (
-          <div>
-            <p className="mb-1 font-mono text-[10px] uppercase tracking-wider text-text-secondary">
-              Resolution note
-            </p>
-            <p className="text-sm text-text-secondary">{incident.resolutionNote}</p>
-          </div>
-        )}
+        {incident.resolutionNote && <ResolutionNote note={incident.resolutionNote} />}
       </CardContent>
     </Card>
   );
@@ -160,6 +184,7 @@ function IncidentActions({ incident }: { incident: Incident }) {
 
 export function IncidentDetailClient({ id }: { id: string }) {
   const { data, isLoading, isError } = useIncidentDetail(id);
+  const role = useSessionRole();
 
   if (isLoading) {
     return <div className="px-6 py-8 text-sm text-text-secondary">Loading incident…</div>;
@@ -205,7 +230,11 @@ export function IncidentDetailClient({ id }: { id: string }) {
       </motion.div>
 
       <motion.div {...fadeIn(0.08)}>
-        <IncidentActions incident={incident} />
+        {role === 'viewer' ? (
+          <ReadOnlyActions incident={incident} />
+        ) : (
+          <IncidentActions incident={incident} />
+        )}
       </motion.div>
 
       <motion.div {...fadeIn(0.16)}>

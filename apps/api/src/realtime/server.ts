@@ -15,7 +15,7 @@ import type { Bus, IncidentEvent } from '../bus/index.js';
 import type { IncidentDetail, PatchIncidentResult } from '../incident/index.js';
 import type { EventSearchParams } from '../storage/index.js';
 import type { SystemHealth } from '../system/index.js';
-import type { AuthService } from '../auth/index.js';
+import { canAccess, type AuthService } from '../auth/index.js';
 import { RateLimiter } from './rate-limit.js';
 
 const UNGATED_PATHS = ['/healthz', '/auth/login', '/auth/register', '/auth/google', '/auth/status'];
@@ -28,6 +28,7 @@ const REQUEST_LIMITER = new RateLimiter(40, 5);
 // tighter brute-force ceiling on the auth endpoints specifically: 5 immediate
 // attempts, refilling at 1 every 5s (12/min sustained).
 const AUTH_LIMITER = new RateLimiter(5, 0.2);
+const RATE_LIMITED_AUTH_PATHS = ['/auth/login', '/auth/register', '/auth/google'];
 
 export interface EventTrace {
   eventId: string;
@@ -57,13 +58,16 @@ export async function createRealtimeServer(bus: Bus, port: number, opts: Realtim
   await app.register(websocketPlugin);
 
   const corsOrigin = opts.corsOrigin ?? '*';
+  // every early response below does `return reply` — in an async hook that's
+  // what tells Fastify the request is finished; without it the remaining hooks
+  // (and the route handler) still run after a 429/401/403 was already sent.
   app.addHook('onRequest', async (req, reply) => {
     reply.header('access-control-allow-origin', corsOrigin);
     // browsers preflight any POST with a JSON body (auth/login etc. all
     // qualify) — Fastify has no route for OPTIONS, so without this it 404s
     // and the preflight (and therefore the real request) is rejected.
     if (req.method === 'OPTIONS') {
-      reply
+      return reply
         .header('access-control-allow-methods', 'GET, POST, PATCH, DELETE, OPTIONS')
         .header('access-control-allow-headers', 'content-type, authorization')
         .code(204)
@@ -74,19 +78,19 @@ export async function createRealtimeServer(bus: Bus, port: number, opts: Realtim
   app.addHook('onRequest', async (req, reply) => {
     if (req.url.startsWith('/healthz') || req.url.startsWith('/ws')) return;
     if (!REQUEST_LIMITER.tryConsume(req.ip)) {
-      reply.code(429).send({ error: 'rate limited — try again shortly' });
+      return reply.code(429).send({ error: 'rate limited — try again shortly' });
     }
   });
 
   app.addHook('onRequest', async (req, reply) => {
-    if (!req.url.startsWith('/auth/login') && !req.url.startsWith('/auth/register')) return;
+    if (!RATE_LIMITED_AUTH_PATHS.some((path) => req.url.startsWith(path))) return;
     if (!AUTH_LIMITER.tryConsume(req.ip)) {
-      reply.code(429).send({ error: 'too many attempts — try again shortly' });
+      return reply.code(429).send({ error: 'too many attempts — try again shortly' });
     }
   });
 
   app.addHook('onRequest', async (req, reply) => {
-    if (!opts.auth.isRequired()) return; // no account registered yet — gate is a no-op
+    if (!opts.auth.isRequired()) return; // open dev install, no account yet — gate is a no-op
     if (UNGATED_PATHS.some((path) => req.url.startsWith(path))) return;
 
     const bearer = req.headers.authorization?.replace(/^Bearer\s+/i, '');
@@ -95,7 +99,10 @@ export async function createRealtimeServer(bus: Bus, port: number, opts: Realtim
 
     const payload = token ? await opts.auth.verify(token) : undefined;
     if (!payload) {
-      reply.code(401).send({ error: 'unauthorized' });
+      return reply.code(401).send({ error: 'unauthorized' });
+    }
+    if (!canAccess(payload.role, req.method, req.url)) {
+      return reply.code(403).send({ error: 'read-only account' });
     }
   });
 
@@ -108,7 +115,10 @@ export async function createRealtimeServer(bus: Bus, port: number, opts: Realtim
 
   app.get('/healthz', async () => ({ status: 'ok', clients: sockets.size }));
 
-  app.get('/auth/status', async () => ({ required: opts.auth.isRequired() }));
+  app.get('/auth/status', async () => ({
+    required: opts.auth.isRequired(),
+    registration: opts.auth.registrationOpen,
+  }));
 
   app.post('/auth/register', async (req, reply) => {
     const { email, password } = (req.body ?? {}) as { email?: string; password?: string };
@@ -116,12 +126,17 @@ export async function createRealtimeServer(bus: Bus, port: number, opts: Realtim
       reply.code(400);
       return { error: 'valid email and password (min 8 chars) required' };
     }
-    const result = await opts.auth.register(email, password);
-    if (!result) {
-      reply.code(409);
-      return { error: 'account already exists' };
+    const registered = await opts.auth.register(email, password);
+    if (!registered.ok) {
+      reply.code(registered.error === 'disabled' ? 403 : 409);
+      return {
+        error:
+          registered.error === 'disabled'
+            ? 'sign-up is disabled on this instance'
+            : 'account already exists',
+      };
     }
-    return { token: result.token };
+    return { token: registered.result.token };
   });
 
   app.post('/auth/login', async (req, reply) => {

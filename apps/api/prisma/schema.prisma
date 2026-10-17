@@ -115,6 +115,13 @@ model NormalizedEventRow {
   @@map("normalized_events")
 }
 
+// mirrors @argus/contracts' Role
+enum Role {
+  admin
+  analyst
+  viewer
+}
+
 // per-user accounts (email+password and/or Google). passwordHash null =
 // Google-only account; googleId null = email/password-only account. The same
 // email via both paths links onto one row (see auth/users.ts upsertGoogleUser).
@@ -124,6 +131,7 @@ model User {
   passwordHash String?  @map("password_hash")
   googleId     String?  @unique @map("google_id")
   name         String?
+  role         Role     @default(analyst)
   createdAt    DateTime @default(now()) @map("created_at")
 
   assignedIncidents Incident[]

@@ -69,6 +69,14 @@ const EnvSchema = z.object({
   // a valid session on every route from then on.
   AUTH_SECRET: z.string().min(16, 'AUTH_SECRET must be at least 16 characters'),
 
+  // self-service sign-up (email form + first-time Google sign-in). 'true' for
+  // local dev; set 'false' on any public deployment — the login gate is then
+  // on from boot and accounts are created with the api's create-user CLI.
+  ALLOW_REGISTRATION: z
+    .enum(['true', 'false'])
+    .default('true')
+    .transform((v) => v === 'true'),
+
   // optional: enables "Sign in with Google" alongside email+password; leave
   // blank to run email+password only (same optional-degradation as LLM_PROVIDER)
   GOOGLE_CLIENT_ID: z.string().optional(),

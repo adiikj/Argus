@@ -245,6 +245,7 @@ await startIncident(kafka, prisma, bus, metrics);
 const authService = await createAuthService(prisma, {
   authSecret: config.AUTH_SECRET,
   googleClientId: config.GOOGLE_CLIENT_ID,
+  allowRegistration: config.ALLOW_REGISTRATION,
 });
 
 await startRealtime(kafka, bus, prisma, eventStore, metrics, authService);

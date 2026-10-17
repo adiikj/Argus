@@ -29,3 +29,20 @@ export async function authFetch(input: string, init: RequestInit = {}): Promise<
   }
   return res;
 }
+
+export type SessionRole = 'admin' | 'analyst' | 'viewer';
+const ROLES: readonly string[] = ['admin', 'analyst', 'viewer'];
+
+// decoded for UI hints only (hiding controls a viewer can't use) — the api
+// verifies the signature and enforces the role on every request regardless.
+export function getRole(): SessionRole | null {
+  const payload = getToken()?.split('.')[1];
+  if (!payload) return null;
+  try {
+    const json = atob(payload.replace(/-/g, '+').replace(/_/g, '/'));
+    const role = (JSON.parse(json) as { role?: unknown }).role;
+    return typeof role === 'string' && ROLES.includes(role) ? (role as SessionRole) : null;
+  } catch {
+    return null;
+  }
+}

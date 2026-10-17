@@ -5,6 +5,8 @@ import { API_URL } from './realtime';
 
 export interface AuthStatus {
   required: boolean;
+  // false = sign-up disabled (ALLOW_REGISTRATION=false); the login page hides it
+  registration: boolean;
 }
 
 // fails open — an unreachable api shouldn't lock a demo out of its own login page,
@@ -12,10 +14,10 @@ export interface AuthStatus {
 async function fetchAuthStatus(): Promise<AuthStatus> {
   try {
     const res = await fetch(`${API_URL}/auth/status`, { cache: 'no-store' });
-    if (!res.ok) return { required: false };
+    if (!res.ok) return { required: false, registration: true };
     return (await res.json()) as AuthStatus;
   } catch {
-    return { required: false };
+    return { required: false, registration: true };
   }
 }
 

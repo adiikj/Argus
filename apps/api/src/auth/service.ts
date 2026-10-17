@@ -8,43 +8,58 @@ export interface AuthResult {
   token: string;
 }
 
+export type RegisterResult =
+  | { ok: true; result: AuthResult }
+  | { ok: false; error: 'taken' | 'disabled' };
+
 export interface AuthService {
   readonly googleClientId: string | undefined;
+  readonly registrationOpen: boolean;
   isRequired(): boolean;
-  register(email: string, password: string): Promise<AuthResult | undefined>;
+  register(email: string, password: string): Promise<RegisterResult>;
   login(email: string, password: string): Promise<AuthResult | undefined>;
   loginWithGoogle(idToken: string): Promise<AuthResult | undefined>;
   verify(token: string): Promise<AppTokenPayload | undefined>;
 }
 
-// the login gate activates the moment the first account is registered — a
-// fresh install stays fully open (frictionless local dev) until then. Seeded
-// once at boot from a real count, flipped in-process on first success so
-// gated requests never need a DB round trip just to check this.
+// two gate modes:
+//   - registration open (dev default): the gate activates the moment the
+//     first account registers — a fresh install stays fully open until then.
+//     Seeded once at boot from a real count, flipped in-process on first
+//     success so gated requests never need a DB round trip to check it.
+//   - registration closed (ALLOW_REGISTRATION=false, prod): the gate is on
+//     from boot even with zero users, so nobody can claim a fresh public
+//     deploy by being first to /login. Accounts come from cli/create-user.
 //
 // Known limitation, not solved here: with multiple api instances each holds
-// its own copy of this flag and can briefly disagree right after the very
-// first registration — not worth Redis-backing for this project's scope.
+// its own copy of the open-mode flag and can briefly disagree right after the
+// very first registration — not worth Redis-backing for this project's scope.
 export async function createAuthService(
   prisma: PrismaClient,
-  opts: { authSecret: string; googleClientId?: string },
+  opts: { authSecret: string; googleClientId?: string; allowRegistration: boolean },
 ): Promise<AuthService> {
-  let required = (await prisma.user.count()) > 0;
+  let required = !opts.allowRegistration || (await prisma.user.count()) > 0;
 
   const issue = async (user: AuthUser): Promise<AuthResult> => ({
     user,
-    token: await signToken(opts.authSecret, { sub: user.userId, email: user.email }),
+    token: await signToken(opts.authSecret, {
+      sub: user.userId,
+      email: user.email,
+      role: user.role,
+    }),
   });
 
   return {
     googleClientId: opts.googleClientId,
+    registrationOpen: opts.allowRegistration,
     isRequired: () => required,
 
     async register(email, password) {
+      if (!opts.allowRegistration) return { ok: false, error: 'disabled' };
       const user = await registerUser(prisma, email, password);
-      if (!user) return undefined;
+      if (!user) return { ok: false, error: 'taken' };
       required = true;
-      return issue(user);
+      return { ok: true, result: await issue(user) };
     },
 
     async login(email, password) {
@@ -56,8 +71,12 @@ export async function createAuthService(
       if (!opts.googleClientId) return undefined;
       const profile = await verifyGoogleIdToken(idToken, opts.googleClientId);
       if (!profile) return undefined;
+      const user = await upsertGoogleUser(prisma, profile, {
+        allowCreate: opts.allowRegistration,
+      });
+      if (!user) return undefined;
       required = true;
-      return issue(await upsertGoogleUser(prisma, profile));
+      return issue(user);
     },
 
     verify: (token) => verifyToken(token, opts.authSecret),

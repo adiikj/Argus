@@ -135,11 +135,22 @@ GROQ_API_KEY=...             # or GEMINI_API_KEY
 ### Auth + rate limiting
 
 Real per-user accounts (email + password, plus optional "Sign in with Google") gate the console —
-`AUTH_SECRET` in `.env` signs sessions and is required. The gate itself is dynamic: a fresh install
-runs fully open until the first account registers at `/login`, then every route requires a valid
-session from then on, same bootstrap pattern self-hosted tools like Grafana/Gitea use. Set
+`AUTH_SECRET` in `.env` signs sessions and is required. Every account has a role — **admin**,
+**analyst** (triages incidents), or **viewer** (read-only; the api 403s every write) — carried in the
+signed session token and enforced server-side on every request.
+
+- **Local dev** (`ALLOW_REGISTRATION=true`): a fresh install runs fully open until the first account
+  registers at `/login` (it becomes admin), then every route requires a valid session — the same
+  bootstrap pattern self-hosted tools like Grafana/Gitea use.
+- **Public deployments** (`ALLOW_REGISTRATION=false`): no self sign-up, and the gate is on from boot
+  even with zero accounts, so nobody can claim a fresh instance by registering first. Accounts come
+  from the CLI (password via hidden prompt, never argv):
+  `pnpm --filter @argus/api user:create --email you@example.com --role admin`. Set
+  `NEXT_PUBLIC_DEMO_EMAIL`/`NEXT_PUBLIC_DEMO_PASSWORD` to a `viewer` account to put an
+  "Explore the live demo" button on the login page. Set
 `GOOGLE_CLIENT_ID` (api) and `NEXT_PUBLIC_GOOGLE_CLIENT_ID` (dashboard, same value) to enable Google
 sign-in alongside email+password; leave both blank to run email+password only. The generator's
 `/simulate/:scenario` and every api REST endpoint are token-bucket rate limited regardless (login/
-register endpoints get a tighter limiter against brute-forcing), so a public demo URL can't be
+register/Google endpoints get a tighter limiter against brute-forcing; `TRUST_PROXY` makes the
+limiter key on the real client IP behind a reverse proxy), so a public demo URL can't be
 scripted into hammering the LLM's free-tier quota or guessing passwords.

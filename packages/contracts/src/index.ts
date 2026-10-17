@@ -83,6 +83,11 @@ export const IncidentPatch = z.object({
 });
 export type IncidentPatch = z.infer<typeof IncidentPatch>;
 
+// admin = everything incl. user management, analyst = triage incidents,
+// viewer = read-only (the public demo account). Carried in the session token.
+export const Role = z.enum(['admin', 'analyst', 'viewer']);
+export type Role = z.infer<typeof Role>;
+
 // GET /users — just enough to populate an assignee picker
 export const PublicUser = z.object({
   userId: z.string().uuid(),
