@@ -1,304 +1,459 @@
 import type { ReactNode } from 'react';
 import Link from 'next/link';
+import {
+  ArrowRight,
+  Brain,
+  Check,
+  Crosshair,
+  Filter,
+  Globe2,
+  Lock,
+  Radar,
+  ShieldCheck,
+} from 'lucide-react';
+import { RULE_CATALOG, attackUrl } from '@argus/contracts/rules';
+import { Github } from '@/components/icons/github';
 import { LiveDemo } from './_components/live-demo';
+import { Reveal } from './_components/reveal';
 import { Wordmark } from './_components/wordmark';
 
-const PIPELINE = ['Generate', 'Stream', 'Normalize', 'Detect', 'Correlate', 'Summarize'];
+const REPO_URL = 'https://github.com/adiikj/Argus';
 
-const STEPS = [
-  {
-    n: '01',
-    title: 'Events stream in',
-    body: 'A scenario-driven generator emits realistic security logs — auth, network, process — onto Kafka. A /simulate API lets you fire attacks on demand.',
-  },
-  {
-    n: '02',
-    title: 'Everything is normalized',
-    body: 'The parser validates each event against a Zod schema at the Kafka boundary and maps it into one canonical shape before anything downstream sees it.',
-  },
-  {
-    n: '03',
-    title: 'The engine detects',
-    body: 'Stateful rules run over the normalized stream — brute-force bursts, privilege escalation, anomalies — and emit alerts the instant a threshold trips.',
-  },
-  {
-    n: '04',
-    title: 'Alerts become incidents',
-    body: 'Correlation groups related alerts into a single incident, and an LLM drafts a plain-language summary so an analyst reads the story, not the noise.',
-  },
+const RULES = Object.values(RULE_CATALOG);
+const TECHNIQUES = new Set(RULES.map((r) => r.technique.id)).size;
+const TACTICS = [...new Set(RULES.map((r) => r.tactic.name))];
+
+const STACK = ['Kafka', 'Fastify', 'PostgreSQL', 'Redis', 'Prisma', 'Next.js', 'Docker', 'Zod'];
+
+const PIPELINE = [
+  { title: 'Ingest', body: 'Synthetic scenarios + real nginx probe traffic' },
+  { title: 'Stream', body: 'Kafka topics, keyed per source, at-least-once' },
+  { title: 'Normalize', body: 'Three log formats → one Zod-validated event' },
+  { title: 'Detect', body: `${RULES.length} rules, stateless + windowed, throttled` },
+  { title: 'Correlate', body: 'Alerts fold into incidents per source' },
+  { title: 'Enrich & explain', body: 'GeoIP, AbuseIPDB, then an LLM summary' },
 ];
 
-const FEATURES = [
-  {
-    icon: 'M4 7h16M4 12h16M4 17h10',
-    title: 'Event-driven ingestion',
-    body: 'Millions of raw events stream in and are normalized into one canonical schema before anything downstream ever sees them.',
-    tag: 'streaming',
-  },
-  {
-    icon: 'M12 3l7 4v5c0 4-3 7-7 8-4-1-7-4-7-8V7l7-4z',
-    title: 'Real-time threat detection',
-    body: 'A stateful engine watches the stream and fires the instant a threshold trips — brute-force bursts, privilege escalation, anomalies.',
-    tag: 'detection',
-  },
-  {
-    icon: 'M8 7a3 3 0 016 0v10a3 3 0 01-6 0M16 7a3 3 0 00-6 0',
-    title: 'Automatic correlation',
-    body: 'Related alerts collapse into a single incident, so your team sees one coherent attack — not a thousand disconnected lines of noise.',
-    tag: 'incidents',
-  },
-  {
-    icon: 'M12 3v4M12 17v4M5 12H3M21 12h-2M6 6l1.5 1.5M16.5 16.5L18 18M18 6l-1.5 1.5M7.5 16.5L6 18',
-    title: 'AI incident summaries',
-    body: 'Every incident is explained in plain language — attacker, target, technique, and the next action to take. No triage archaeology.',
-    tag: 'ai',
-  },
-  {
-    icon: 'M3 5h18v11H3zM8 20h8M12 16v4',
-    title: 'Real-time console',
-    body: 'Alerts appear the moment they fire over a live connection — no refreshing, no polling, no waiting for a batch job.',
-    tag: 'live',
-  },
-  {
-    icon: 'M9 6l-4 6 4 6M15 6l4 6-4 6',
-    title: 'Reliable by design',
-    body: 'Every event is validated at the boundary and carries a trace id end-to-end, so nothing silently drops and everything is auditable.',
-    tag: 'trust',
-  },
+const HARDENING = [
+  'Role-based access — admin, analyst, read-only demo',
+  'Sign-up locked on public deploys; accounts via CLI',
+  'Strict CSP, HSTS, no-sniff, frame-deny on every response',
+  'Rate limits keyed on the real client IP behind the proxy',
+  'CodeQL, gitleaks, Trivy and an SBOM on every push',
+  'Images scanned before they ship; containers run non-root',
 ];
 
-const STATS = [
-  { value: '1M+', label: 'events processed / run' },
-  { value: '<1s', label: 'event → alert on screen' },
-  { value: '24/7', label: 'always-on monitoring' },
-  { value: '100%', label: 'events traced end-to-end' },
-];
+function Eyebrow({ children }: { children: ReactNode }) {
+  return (
+    <span className="inline-flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.2em] text-accent">
+      <span className="bg-brand h-px w-6" />
+      {children}
+    </span>
+  );
+}
 
-function CtaButton({ children }: { children: ReactNode }) {
+function PrimaryCta({ children }: { children: ReactNode }) {
   return (
     <Link
       href="/login"
-      className="group inline-flex items-center gap-2 rounded-lg bg-accent px-6 py-3 font-mono text-sm font-semibold text-bg-base transition-transform hover:-translate-y-0.5"
+      className="bg-brand group inline-flex h-11 items-center gap-2 rounded-lg px-5 text-sm font-semibold text-bg-base shadow-[0_10px_40px_-10px_var(--color-accent)] transition hover:brightness-110"
     >
       {children}
-      <span className="transition-transform group-hover:translate-x-0.5">→</span>
+      <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
     </Link>
+  );
+}
+
+function GithubCta() {
+  return (
+    <a
+      href={REPO_URL}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="inline-flex h-11 items-center gap-2 rounded-lg border border-border-strong bg-bg-panel/60 px-5 text-sm font-medium text-text-primary transition hover:border-text-muted hover:bg-bg-elevated"
+    >
+      <Github className="h-4 w-4" />
+      View source
+    </a>
+  );
+}
+
+function BentoCard({
+  icon: Icon,
+  title,
+  body,
+  className = '',
+  children,
+}: {
+  icon: typeof Radar;
+  title: string;
+  body: string;
+  className?: string;
+  children?: ReactNode;
+}) {
+  return (
+    <div
+      className={`surface group relative flex flex-col overflow-hidden rounded-2xl border border-border-subtle p-6 transition-colors hover:border-border-strong ${className}`}
+    >
+      <div
+        aria-hidden
+        className="pointer-events-none absolute -top-24 -right-24 h-48 w-48 rounded-full bg-accent/10 opacity-0 blur-3xl transition-opacity duration-500 group-hover:opacity-100"
+      />
+      <span className="flex h-10 w-10 items-center justify-center rounded-xl border border-border-strong bg-bg-elevated text-accent">
+        <Icon className="h-5 w-5" strokeWidth={1.8} />
+      </span>
+      <h3 className="mt-5 text-[17px] font-semibold tracking-tight">{title}</h3>
+      <p className="mt-2 text-sm leading-relaxed text-text-secondary">{body}</p>
+      {children && <div className="mt-6 flex-1">{children}</div>}
+    </div>
   );
 }
 
 export default function Landing() {
   return (
-    <div className="min-h-screen bg-bg-base text-text-primary">
-      <header className="sticky top-0 z-20 border-b border-border-subtle bg-bg-base/70 backdrop-blur">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
+    <div className="min-h-screen overflow-x-hidden bg-bg-base text-text-primary">
+      <header className="glass sticky top-0 z-30 border-b border-border-subtle/70">
+        <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-6">
           <Wordmark />
-          <nav className="flex items-center gap-6 font-mono text-xs text-text-secondary">
-            <a href="#how" className="hidden transition-colors hover:text-text-primary sm:inline">
+          <nav className="hidden items-center gap-8 text-[13px] text-text-secondary md:flex">
+            <a href="#pipeline" className="transition-colors hover:text-text-primary">
               How it works
             </a>
-            <a
-              href="#features"
-              className="hidden transition-colors hover:text-text-primary sm:inline"
-            >
+            <a href="#features" className="transition-colors hover:text-text-primary">
               Features
             </a>
-            <Link
-              href="/about"
-              className="hidden transition-colors hover:text-text-primary sm:inline"
-            >
+            <a href="#coverage" className="transition-colors hover:text-text-primary">
+              ATT&amp;CK coverage
+            </a>
+            <Link href="/about" className="transition-colors hover:text-text-primary">
               About
             </Link>
-            <Link href="/login" className="transition-colors hover:text-accent">
-              live console →
-            </Link>
           </nav>
+          <div className="flex items-center gap-2">
+            <a
+              href={REPO_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="GitHub repository"
+              className="hidden rounded-lg p-2 text-text-secondary transition-colors hover:bg-bg-elevated hover:text-text-primary sm:block"
+            >
+              <Github className="h-4 w-4" />
+            </a>
+            <Link
+              href="/login"
+              className="rounded-lg border border-border-strong bg-bg-panel px-3.5 py-1.5 text-[13px] font-medium transition-colors hover:border-accent/50 hover:text-accent"
+            >
+              Open console
+            </Link>
+          </div>
         </div>
       </header>
 
       <main>
         {/* hero */}
-        <section className="relative overflow-hidden border-b border-border-subtle">
+        <section className="relative">
           <div
-            className="pointer-events-none absolute inset-0 opacity-[0.04]"
-            style={{
-              backgroundImage:
-                'linear-gradient(var(--color-text-secondary) 1px, transparent 1px), linear-gradient(90deg, var(--color-text-secondary) 1px, transparent 1px)',
-              backgroundSize: '48px 48px',
-            }}
+            aria-hidden
+            className="bg-grid mask-radial pointer-events-none absolute inset-0 opacity-60"
           />
-          <div className="relative mx-auto max-w-6xl px-6 pt-24 pb-16 text-center">
-            <span className="inline-flex items-center gap-2 rounded-full border border-border-subtle bg-bg-panel px-3 py-1 font-mono text-xs text-text-secondary">
-              <span className="h-2 w-2 animate-pulse rounded-full bg-accent" />
-              AI-powered security event analysis
-            </span>
-
-            <h1 className="mx-auto mt-8 max-w-3xl text-balance text-5xl font-semibold leading-[1.05] tracking-tight sm:text-6xl">
-              The hundred-eyed watchman for your logs.
-            </h1>
-
-            <p className="mx-auto mt-6 max-w-2xl text-lg text-text-secondary">
-              Argus ingests a live stream of security events, detects threats with a rule-based
-              engine, correlates them into incidents, and explains each one in plain language — all
-              on a real-time console.
-            </p>
-
-            <div className="mt-10 flex items-center justify-center gap-4">
-              <CtaButton>Launch the console</CtaButton>
+          <div
+            aria-hidden
+            className="pointer-events-none absolute top-0 left-1/2 h-[520px] w-[900px] -translate-x-1/2 bg-[radial-gradient(closest-side,color-mix(in_srgb,var(--color-accent-2)_14%,transparent),transparent)]"
+          />
+          <div className="relative mx-auto max-w-6xl px-6 pt-20 pb-14 text-center sm:pt-28">
+            <Reveal>
               <a
-                href="https://github.com"
-                className="rounded-lg border border-border-subtle px-6 py-3 font-mono text-sm text-text-secondary transition-colors hover:border-text-secondary hover:text-text-primary"
+                href="#features"
+                className="inline-flex items-center gap-2 rounded-full border border-border-strong bg-bg-panel/70 py-1 pr-3 pl-1 text-[12px] text-text-secondary backdrop-blur transition-colors hover:border-accent/40"
               >
-                View source
+                <span className="bg-brand rounded-full px-2 py-0.5 font-mono text-[10px] font-semibold text-bg-base">
+                  LIVE
+                </span>
+                Running on real internet traffic at argus.buzz
+                <ArrowRight className="h-3 w-3" />
               </a>
-            </div>
-          </div>
+            </Reveal>
 
-          {/* live demo panel */}
-          <div className="relative mx-auto max-w-5xl px-6 pt-6 pb-24">
-            <LiveDemo />
-            <p className="mt-5 text-center font-mono text-xs text-text-secondary">
-              A live simulation — real alerts stream the same way inside the console.
-            </p>
-          </div>
-        </section>
+            <Reveal delay={0.05}>
+              <h1 className="mx-auto mt-8 max-w-4xl text-balance text-[44px] font-semibold leading-[1.02] tracking-[-0.035em] sm:text-[68px]">
+                Every attack, seen.
+                <br />
+                <span className="text-gradient">Every incident, explained.</span>
+              </h1>
+            </Reveal>
 
-        {/* pipeline strip */}
-        <section className="border-b border-border-subtle bg-bg-panel/40">
-          <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-center gap-x-3 gap-y-4 px-6 py-8">
-            {PIPELINE.map((step, i) => (
-              <div key={step} className="flex items-center gap-3">
-                <span className="font-mono text-sm text-text-secondary">
-                  <span className="text-accent">{String(i + 1).padStart(2, '0')}</span> {step}
-                </span>
-                {i < PIPELINE.length - 1 && (
-                  <span className="text-border-subtle" aria-hidden>
-                    ──
-                  </span>
-                )}
-              </div>
-            ))}
-          </div>
-        </section>
-
-        {/* how it works */}
-        <section id="how" className="mx-auto max-w-6xl px-6 py-24">
-          <h2 className="text-center text-sm font-semibold uppercase tracking-[0.2em] text-text-secondary">
-            How it works
-          </h2>
-          <p className="mx-auto mt-4 max-w-2xl text-center text-text-secondary">
-            An event-driven pipeline, end to end — every stage is a real module that could stand
-            alone as a service.
-          </p>
-          <div className="mt-14 grid gap-px overflow-hidden rounded-xl border border-border-subtle bg-border-subtle sm:grid-cols-2">
-            {STEPS.map((step) => (
-              <div key={step.n} className="bg-bg-panel p-8">
-                <span className="font-mono text-sm text-accent">{step.n}</span>
-                <h3 className="mt-3 text-lg font-semibold">{step.title}</h3>
-                <p className="mt-2 text-sm leading-relaxed text-text-secondary">{step.body}</p>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        {/* AI incident summary showcase */}
-        <section className="border-y border-border-subtle bg-bg-panel/40">
-          <div className="mx-auto grid max-w-6xl items-center gap-12 px-6 py-24 lg:grid-cols-2">
-            <div>
-              <span className="font-mono text-xs uppercase tracking-[0.2em] text-accent">
-                AI incident summaries
-              </span>
-              <h2 className="mt-4 text-3xl font-semibold tracking-tight">
-                From a wall of alerts to a paragraph a human can act on.
-              </h2>
-              <p className="mt-4 text-text-secondary">
-                Correlation stitches related alerts into one incident, then an LLM writes the
-                summary — attacker, target, technique, and what to do next. No model key configured?
-                Argus falls back to a deterministic template so it always runs.
+            <Reveal delay={0.1}>
+              <p className="mx-auto mt-6 max-w-2xl text-pretty text-[17px] leading-relaxed text-text-secondary">
+                Argus streams security logs through Kafka, runs {RULES.length} detection rules
+                mapped to MITRE ATT&amp;CK, correlates alerts into incidents, enriches them with
+                GeoIP and threat intel, and has an LLM write the analyst&apos;s first draft — all
+                live.
               </p>
-            </div>
+            </Reveal>
 
-            <div className="rounded-xl border border-border-subtle bg-bg-panel p-6 shadow-2xl shadow-black/40">
-              <div className="flex items-center justify-between border-b border-border-subtle pb-4">
-                <span className="font-mono text-xs text-text-secondary">INC-2043</span>
-                <span className="rounded border border-severity-critical/30 bg-severity-critical/15 px-2 py-0.5 font-mono text-[10px] font-semibold uppercase text-severity-critical">
-                  critical
-                </span>
+            <Reveal delay={0.15}>
+              <div className="mt-9 flex flex-wrap items-center justify-center gap-3">
+                <PrimaryCta>Explore the live demo</PrimaryCta>
+                <GithubCta />
               </div>
-              <ul className="mt-4 space-y-1.5 font-mono text-xs text-text-secondary">
-                <li>· 61× failed SSH from 10.0.4.12</li>
-                <li>· successful root login on prod-web-01</li>
-                <li>· privilege escalation + outbound :4444</li>
-              </ul>
-              <div className="mt-4 rounded-lg border border-accent/20 bg-accent/5 p-4">
-                <span className="font-mono text-[10px] uppercase tracking-wider text-accent">
-                  Generated summary
-                </span>
-                <p className="mt-2 text-sm leading-relaxed text-text-primary">
-                  A brute-force campaign from <span className="text-accent">10.0.4.12</span>{' '}
-                  succeeded against <span className="text-accent">prod-web-01</span> after 61 failed
-                  attempts, gaining root and opening an outbound channel on port 4444. Likely C2.
-                  Isolate the host and rotate credentials.
-                </p>
+            </Reveal>
+
+            <Reveal delay={0.2}>
+              <div className="mt-12 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 font-mono text-[11px] uppercase tracking-[0.18em] text-text-muted">
+                {STACK.map((tech) => (
+                  <span key={tech}>{tech}</span>
+                ))}
               </div>
+            </Reveal>
+          </div>
+
+          <div className="relative mx-auto max-w-6xl px-6 pb-24">
+            <Reveal delay={0.1}>
+              <LiveDemo />
+            </Reveal>
+          </div>
+        </section>
+
+        {/* numbers */}
+        <section className="border-y border-border-subtle bg-bg-panel/40">
+          <div className="mx-auto grid max-w-6xl grid-cols-2 lg:grid-cols-4">
+            {[
+              [String(RULES.length), 'detection rules'],
+              [String(TECHNIQUES), 'ATT&CK techniques'],
+              [String(TACTICS.length), 'ATT&CK tactics'],
+              ['0', 'API keys required to run'],
+            ].map(([value, label], i) => (
+              <div
+                key={label}
+                className={`px-6 py-10 text-center ${i > 0 ? 'lg:border-l' : ''} ${i % 2 === 1 ? 'border-l' : ''} border-border-subtle`}
+              >
+                <div className="text-gradient font-mono text-4xl font-semibold tracking-tight">
+                  {value}
+                </div>
+                <div className="mt-2 text-sm text-text-secondary">{label}</div>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* pipeline */}
+        <section id="pipeline" className="mx-auto max-w-6xl scroll-mt-20 px-6 py-28">
+          <Reveal className="max-w-2xl">
+            <Eyebrow>How it works</Eyebrow>
+            <h2 className="mt-4 text-3xl font-semibold tracking-tight sm:text-4xl">
+              One event-driven pipeline, from raw log line to explained incident.
+            </h2>
+            <p className="mt-4 text-text-secondary">
+              Every stage is its own module behind a typed contract — any of them could be split out
+              as a service without touching the others.
+            </p>
+          </Reveal>
+
+          <div className="relative mt-14 grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
+            <div
+              aria-hidden
+              className="absolute top-7 right-8 left-8 hidden h-px overflow-hidden bg-border-strong lg:block"
+            >
+              <div className="animate-beam h-full w-1/4 bg-[linear-gradient(90deg,transparent,var(--color-accent),transparent)]" />
             </div>
+            {PIPELINE.map((step, i) => (
+              <Reveal key={step.title} delay={i * 0.06}>
+                <div className="relative">
+                  <div className="surface relative z-10 mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-border-strong font-mono text-sm text-accent lg:mx-0">
+                    {String(i + 1).padStart(2, '0')}
+                  </div>
+                  <h3 className="mt-4 text-center text-[15px] font-semibold lg:text-left">
+                    {step.title}
+                  </h3>
+                  <p className="mt-1.5 text-center text-[13px] leading-relaxed text-text-secondary lg:text-left">
+                    {step.body}
+                  </p>
+                </div>
+              </Reveal>
+            ))}
           </div>
         </section>
 
         {/* features */}
-        <section id="features" className="mx-auto max-w-6xl px-6 py-28">
-          <div className="text-center">
-            <span className="font-mono text-xs uppercase tracking-[0.2em] text-accent">
-              Capabilities
-            </span>
-            <h2 className="mx-auto mt-4 max-w-2xl text-3xl font-semibold tracking-tight sm:text-4xl">
-              Everything your SOC needs, watching in real time.
-            </h2>
-          </div>
-          <div className="mt-16 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-            {FEATURES.map((feature) => (
-              <div
-                key={feature.title}
-                className="group/card relative overflow-hidden rounded-2xl border border-border-subtle bg-bg-panel p-7 transition-all duration-300 hover:-translate-y-1 hover:border-accent/40 hover:shadow-2xl hover:shadow-accent/5"
-              >
-                {/* hover glow */}
-                <div
-                  aria-hidden
-                  className="pointer-events-none absolute -right-16 -top-16 h-32 w-32 rounded-full bg-accent/10 opacity-0 blur-2xl transition-opacity duration-300 group-hover/card:opacity-100"
+        <section
+          id="features"
+          className="scroll-mt-20 border-t border-border-subtle bg-bg-panel/30"
+        >
+          <div className="mx-auto max-w-6xl px-6 py-28">
+            <Reveal className="mx-auto max-w-2xl text-center">
+              <Eyebrow>Capabilities</Eyebrow>
+              <h2 className="mt-4 text-3xl font-semibold tracking-tight sm:text-4xl">
+                Built like a real SOC tool, not a dashboard demo.
+              </h2>
+            </Reveal>
+
+            <div className="mt-14 grid gap-4 md:grid-cols-3">
+              <Reveal className="md:col-span-2">
+                <BentoCard
+                  icon={Radar}
+                  title="Real attack traffic, not just a simulator"
+                  body="nginx writes every request for a path the api doesn't serve to a probe log, and Argus tails it into the same pipeline. Internet scanners hitting the live deployment become real incidents, with real GeoIP pins."
+                  className="h-full"
+                >
+                  <div className="rounded-xl border border-border-subtle bg-bg-base/70 p-4 font-mono text-[11.5px] leading-6">
+                    {[
+                      ['GET /.env', '404', 'dir-enumeration'],
+                      [
+                        'GET /cgi-bin/luci/;stok=/locale?…$(id>`wget…`)',
+                        '404',
+                        'command-injection',
+                      ],
+                      ['GET /static/../../../../etc/passwd', '400', 'path-traversal'],
+                      ['GET /wp-login.php', '404', 'suppressed · throttled'],
+                    ].map(([req, status, rule]) => (
+                      <div key={req} className="flex items-center gap-3">
+                        <span className="text-text-muted">192.0.2.10</span>
+                        <span className="min-w-0 flex-1 truncate text-text-secondary">{req}</span>
+                        <span className="text-text-muted">{status}</span>
+                        <span className="hidden text-accent sm:inline">{rule}</span>
+                      </div>
+                    ))}
+                  </div>
+                </BentoCard>
+              </Reveal>
+
+              <Reveal delay={0.06}>
+                <BentoCard
+                  icon={Brain}
+                  title="AI incident summaries"
+                  body="An LLM gets the alerts, their ATT&CK techniques and the source's reputation, and writes the story plus next steps. No key? A deterministic template keeps it running."
+                  className="h-full"
                 />
-                <div className="flex items-center justify-between">
-                  <span className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-border-subtle bg-bg-elevated text-accent transition-colors group-hover/card:border-accent/40">
-                    <svg
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth={1.6}
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      className="h-5 w-5"
-                    >
-                      <path d={feature.icon} />
-                    </svg>
-                  </span>
-                  <span className="font-mono text-[10px] uppercase tracking-wider text-text-secondary">
-                    {feature.tag}
-                  </span>
-                </div>
-                <h3 className="mt-6 text-lg font-semibold text-text-primary">{feature.title}</h3>
-                <p className="mt-2.5 text-sm leading-relaxed text-text-secondary">{feature.body}</p>
-              </div>
-            ))}
+              </Reveal>
+
+              <Reveal delay={0.04}>
+                <BentoCard
+                  icon={Globe2}
+                  title="GeoIP + threat intel"
+                  body="Every source IP is located (DB-IP) and scored by AbuseIPDB — cached, quota-capped, and never sent out for demo or internal addresses."
+                  className="h-full"
+                >
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between font-mono text-[11px]">
+                      <span className="text-text-secondary">abuse confidence</span>
+                      <span className="text-severity-critical">100 / 100</span>
+                    </div>
+                    <div className="h-1.5 overflow-hidden rounded-full bg-bg-elevated">
+                      <div className="h-full w-full rounded-full bg-severity-critical" />
+                    </div>
+                    <div className="font-mono text-[11px] text-text-muted">
+                      4,312 reports · data center · NL
+                    </div>
+                  </div>
+                </BentoCard>
+              </Reveal>
+
+              <Reveal delay={0.08}>
+                <BentoCard
+                  icon={Filter}
+                  title="Noise under control"
+                  body="Alerts throttle per rule and source, so a scanner sending thousands of requests stays one readable incident — the next alert says how many it stood in for."
+                  className="h-full"
+                >
+                  <div className="rounded-lg border border-border-subtle bg-bg-base/70 px-3 py-2 font-mono text-[11px] text-text-secondary">
+                    Sensitive path probe: /.env{' '}
+                    <span className="text-accent">(+412 similar suppressed)</span>
+                  </div>
+                </BentoCard>
+              </Reveal>
+
+              <Reveal delay={0.12}>
+                <BentoCard
+                  icon={Crosshair}
+                  title="Attack simulator"
+                  body="Ten scenarios — account takeover, spraying, SQLi, traversal, XSS, command injection — fired on demand at the live pipeline, each proven by a test to trip its rule."
+                  className="h-full"
+                />
+              </Reveal>
+            </div>
           </div>
         </section>
 
-        {/* stats band */}
-        <section className="border-y border-border-subtle bg-bg-panel/40">
-          <div className="mx-auto grid max-w-6xl grid-cols-2 gap-px overflow-hidden bg-border-subtle lg:grid-cols-4">
-            {STATS.map((stat) => (
-              <div key={stat.label} className="bg-bg-base px-6 py-12 text-center">
-                <div className="font-mono text-4xl font-semibold text-accent">{stat.value}</div>
-                <div className="mt-2 text-sm text-text-secondary">{stat.label}</div>
+        {/* ATT&CK coverage */}
+        <section id="coverage" className="scroll-mt-20 border-t border-border-subtle">
+          <div className="mx-auto grid max-w-6xl gap-14 px-6 py-28 lg:grid-cols-5">
+            <Reveal className="lg:col-span-2">
+              <Eyebrow>MITRE ATT&amp;CK</Eyebrow>
+              <h2 className="mt-4 text-3xl font-semibold tracking-tight">
+                Detections speak the analyst&apos;s language.
+              </h2>
+              <p className="mt-4 text-text-secondary">
+                Every rule maps to a technique and tactic from one shared catalog — the same source
+                drives the console&apos;s badges, its kill-chain view, the AI prompts and this list,
+                so they can&apos;t drift apart.
+              </p>
+              <div className="mt-6 flex flex-wrap gap-2">
+                {TACTICS.map((t) => (
+                  <span
+                    key={t}
+                    className="rounded-full border border-border-strong bg-bg-panel px-3 py-1 text-[12px] text-text-secondary"
+                  >
+                    {t}
+                  </span>
+                ))}
               </div>
-            ))}
+            </Reveal>
+
+            <Reveal delay={0.08} className="lg:col-span-3">
+              <div className="surface overflow-hidden rounded-2xl border border-border-subtle">
+                <ul className="divide-y divide-border-subtle">
+                  {RULES.map((rule) => (
+                    <li key={rule.id} className="flex items-center gap-4 px-5 py-3">
+                      <span className="min-w-0 flex-1 truncate text-[13.5px]">{rule.name}</span>
+                      <span className="hidden text-[12px] text-text-muted sm:inline">
+                        {rule.tactic.name}
+                      </span>
+                      <a
+                        href={attackUrl(rule.technique.id)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="w-[84px] shrink-0 rounded-md border border-accent/25 bg-accent/10 px-2 py-0.5 text-center font-mono text-[11px] text-accent transition-colors hover:bg-accent/20"
+                      >
+                        {rule.technique.id}
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </Reveal>
+          </div>
+        </section>
+
+        {/* hardening */}
+        <section className="border-t border-border-subtle bg-bg-panel/30">
+          <div className="mx-auto grid max-w-6xl items-center gap-12 px-6 py-24 lg:grid-cols-2">
+            <Reveal>
+              <span className="flex h-12 w-12 items-center justify-center rounded-2xl border border-border-strong bg-bg-elevated text-accent">
+                <Lock className="h-5 w-5" />
+              </span>
+              <h2 className="mt-6 text-3xl font-semibold tracking-tight">
+                A security tool that takes its own security seriously.
+              </h2>
+              <p className="mt-4 text-text-secondary">
+                Hardened like a production service — because a SIEM with a weak perimeter is the
+                first thing an attacker goes after.
+              </p>
+            </Reveal>
+            <Reveal delay={0.08}>
+              <ul className="grid gap-3">
+                {HARDENING.map((item) => (
+                  <li
+                    key={item}
+                    className="surface flex items-center gap-3 rounded-xl border border-border-subtle px-4 py-3 text-[14px]"
+                  >
+                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-severity-ok/15 text-severity-ok">
+                      <Check className="h-3.5 w-3.5" strokeWidth={2.5} />
+                    </span>
+                    {item}
+                  </li>
+                ))}
+              </ul>
+            </Reveal>
           </div>
         </section>
 
@@ -306,29 +461,48 @@ export default function Landing() {
         <section className="relative overflow-hidden border-t border-border-subtle">
           <div
             aria-hidden
-            className="animate-glow pointer-events-none absolute inset-x-0 -top-24 -z-10 mx-auto h-64 max-w-3xl rounded-full bg-accent/15 blur-3xl"
+            className="bg-dots mask-radial pointer-events-none absolute inset-0 opacity-70"
           />
-          <div className="mx-auto max-w-6xl px-6 py-28 text-center">
-            <h2 className="mx-auto max-w-2xl text-4xl font-semibold tracking-tight">
-              See it detect an attack, live.
+          <div
+            aria-hidden
+            className="animate-glow pointer-events-none absolute inset-x-0 top-0 mx-auto h-72 max-w-3xl rounded-full bg-[radial-gradient(closest-side,color-mix(in_srgb,var(--color-accent)_25%,transparent),transparent)] blur-2xl"
+          />
+          <Reveal className="relative mx-auto max-w-3xl px-6 py-28 text-center">
+            <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-border-strong bg-bg-elevated text-accent">
+              <ShieldCheck className="h-6 w-6" />
+            </span>
+            <h2 className="mt-6 text-4xl font-semibold tracking-tight sm:text-5xl">
+              Watch it catch an attack.
             </h2>
             <p className="mx-auto mt-4 max-w-lg text-lg text-text-secondary">
-              Watch alerts fire, correlate into incidents, and get explained — in real time.
+              Sign in with the read-only demo, fire a scenario from the simulator, and follow it
+              from log line to AI summary in seconds.
             </p>
-            <div className="mt-10">
-              <CtaButton>Launch the console</CtaButton>
+            <div className="mt-9 flex flex-wrap justify-center gap-3">
+              <PrimaryCta>Explore the live demo</PrimaryCta>
+              <GithubCta />
             </div>
-          </div>
+          </Reveal>
         </section>
 
         <footer className="border-t border-border-subtle">
-          <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-3 px-6 py-8 font-mono text-xs text-text-secondary sm:flex-row">
-            <Wordmark />
-            <span>The hundred-eyed watchman for your logs.</span>
+          <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 px-6 py-8 text-[13px] text-text-muted sm:flex-row">
             <div className="flex items-center gap-4">
+              <Wordmark />
+              <span className="hidden sm:inline">Security event analysis, live.</span>
+            </div>
+            <div className="flex items-center gap-5">
               <Link href="/about" className="transition-colors hover:text-text-primary">
-                About this project
+                About
               </Link>
+              <a
+                href={REPO_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="transition-colors hover:text-text-primary"
+              >
+                GitHub
+              </a>
               <a
                 href="https://adiikj.dev"
                 target="_blank"

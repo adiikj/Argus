@@ -164,190 +164,220 @@ export default function LoginPage() {
   };
 
   return (
-    <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-bg-base px-4">
-      {/* faint grid, matching the landing page hero */}
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-0 opacity-[0.04]"
-        style={{
-          backgroundImage:
-            'linear-gradient(var(--color-text-secondary) 1px, transparent 1px), linear-gradient(90deg, var(--color-text-secondary) 1px, transparent 1px)',
-          backgroundSize: '48px 48px',
-        }}
-      />
-      <div
-        aria-hidden
-        className="animate-glow pointer-events-none absolute left-1/2 top-1/2 -z-10 h-72 w-72 -translate-x-1/2 -translate-y-1/2 rounded-full bg-accent/15 blur-3xl"
-      />
-
-      <div className="relative w-full max-w-sm">
-        <div className="mb-8 flex justify-center">
+    <main className="grid min-h-screen bg-bg-base lg:grid-cols-2">
+      {/* brand panel */}
+      <aside className="relative hidden overflow-hidden border-r border-border-subtle lg:flex lg:flex-col lg:justify-between lg:p-12">
+        <div
+          aria-hidden
+          className="bg-grid mask-radial pointer-events-none absolute inset-0 opacity-70"
+        />
+        <div
+          aria-hidden
+          className="pointer-events-none absolute -top-40 -left-40 h-[520px] w-[520px] rounded-full bg-[radial-gradient(closest-side,color-mix(in_srgb,var(--color-accent)_22%,transparent),transparent)]"
+        />
+        <div
+          aria-hidden
+          className="pointer-events-none absolute -right-40 -bottom-40 h-[520px] w-[520px] rounded-full bg-[radial-gradient(closest-side,color-mix(in_srgb,var(--color-accent-2)_18%,transparent),transparent)]"
+        />
+        <div className="relative">
           <Wordmark />
         </div>
+        <div className="relative max-w-md">
+          <h2 className="text-[34px] font-semibold leading-[1.1] tracking-[-0.03em]">
+            The hundred-eyed watchman,{' '}
+            <span className="text-gradient">on duty around the clock.</span>
+          </h2>
+          <ul className="mt-8 space-y-3 text-[14px] text-text-secondary">
+            {[
+              'Live detections mapped to MITRE ATT&CK',
+              'Incidents correlated, enriched and explained by AI',
+              'Real scanner traffic from the public internet',
+            ].map((line) => (
+              <li key={line} className="flex items-center gap-3">
+                <span className="bg-brand h-1.5 w-1.5 rounded-full" />
+                {line}
+              </li>
+            ))}
+          </ul>
+        </div>
+        <p className="relative font-mono text-[11px] text-text-muted">
+          Read-only demo available — no account needed.
+        </p>
+      </aside>
 
-        <div className="rounded-2xl border border-border-subtle bg-bg-panel p-7 shadow-2xl shadow-black/40">
-          {registrationOpen && (
-            <div className="mb-6 flex items-center gap-1 rounded-lg border border-border-subtle bg-bg-base p-1">
-              {(['login', 'register'] as const).map((m) => (
-                <button
-                  key={m}
-                  type="button"
-                  onClick={() => {
-                    setMode(m);
-                    setError(null);
-                  }}
-                  className={`flex-1 rounded-md py-1.5 font-mono text-xs uppercase tracking-wider transition-colors ${
-                    mode === m
-                      ? 'bg-accent text-bg-base font-semibold'
-                      : 'text-text-secondary hover:text-text-primary'
-                  }`}
-                >
-                  {m === 'login' ? 'Sign in' : 'Sign up'}
-                </button>
-              ))}
-            </div>
-          )}
+      <div className="relative flex items-center justify-center px-4 py-12">
+        <div className="relative w-full max-w-sm">
+          <div className="mb-8 flex justify-center lg:hidden">
+            <Wordmark />
+          </div>
 
-          <p className="mb-5 text-sm text-text-secondary">
+          <h1 className="mb-1 text-[22px] font-semibold tracking-tight">
+            {mode === 'login' ? 'Sign in to Argus' : 'Create your account'}
+          </h1>
+          <p className="mb-6 text-sm text-text-secondary">
             {mode === 'login'
-              ? 'Sign in to reach the live console.'
-              : 'Create an account to reach the live console.'}
+              ? 'Welcome back — the console is live.'
+              : 'Get access to the live console.'}
           </p>
 
-          <form onSubmit={onSubmit} className="flex flex-col gap-4">
-            <div className="flex flex-col gap-1.5">
-              <label htmlFor="email" className={LABEL_CLASS}>
-                Email
-              </label>
-              <div className="relative">
-                <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary">
-                  <MailIcon />
-                </span>
-                <input
-                  id="email"
-                  type="email"
-                  autoFocus
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="you@example.com"
-                  className={`${INPUT_CLASS} pl-9`}
-                />
+          <div className="surface rounded-2xl border border-border-subtle p-6">
+            {registrationOpen && (
+              <div className="mb-6 flex items-center gap-1 rounded-lg border border-border-subtle bg-bg-base p-1">
+                {(['login', 'register'] as const).map((m) => (
+                  <button
+                    key={m}
+                    type="button"
+                    onClick={() => {
+                      setMode(m);
+                      setError(null);
+                    }}
+                    className={`flex-1 rounded-md py-1.5 font-mono text-xs uppercase tracking-wider transition-colors ${
+                      mode === m
+                        ? 'bg-accent text-bg-base font-semibold'
+                        : 'text-text-secondary hover:text-text-primary'
+                    }`}
+                  >
+                    {m === 'login' ? 'Sign in' : 'Sign up'}
+                  </button>
+                ))}
               </div>
-            </div>
-
-            <div className="flex flex-col gap-1.5">
-              <label htmlFor="password" className={LABEL_CLASS}>
-                Password
-              </label>
-              <div className="relative">
-                <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary">
-                  <LockIcon />
-                </span>
-                <input
-                  id="password"
-                  type={showPassword ? 'text' : 'password'}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder={mode === 'login' ? '••••••••' : 'min. 8 characters'}
-                  className={`${INPUT_CLASS} pl-9 pr-9`}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword((v) => !v)}
-                  aria-label={showPassword ? 'Hide password' : 'Show password'}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-text-secondary transition-colors hover:text-text-primary"
-                >
-                  <EyeIcon open={showPassword} />
-                </button>
-              </div>
-            </div>
-
-            {error && (
-              <p className="rounded-lg border border-severity-critical/30 bg-severity-critical/10 px-3 py-2 text-xs text-severity-critical">
-                {error}
-              </p>
             )}
 
-            <Button
-              type="submit"
-              size="lg"
-              disabled={pending || !email || !password}
-              className="w-full"
-            >
-              {pending ? 'Checking…' : mode === 'login' ? 'Sign in' : 'Create account'}
-            </Button>
-          </form>
-
-          {DEMO_EMAIL && DEMO_PASSWORD && mode === 'login' && (
-            <>
-              <div className="my-5 flex items-center gap-3 font-mono text-[10px] uppercase tracking-wider text-text-secondary">
-                <span className="h-px flex-1 bg-border-subtle" />
-                just looking?
-                <span className="h-px flex-1 bg-border-subtle" />
+            <form onSubmit={onSubmit} className="flex flex-col gap-4">
+              <div className="flex flex-col gap-1.5">
+                <label htmlFor="email" className={LABEL_CLASS}>
+                  Email
+                </label>
+                <div className="relative">
+                  <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary">
+                    <MailIcon />
+                  </span>
+                  <input
+                    id="email"
+                    type="email"
+                    autoFocus
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="you@example.com"
+                    className={`${INPUT_CLASS} pl-9`}
+                  />
+                </div>
               </div>
+
+              <div className="flex flex-col gap-1.5">
+                <label htmlFor="password" className={LABEL_CLASS}>
+                  Password
+                </label>
+                <div className="relative">
+                  <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary">
+                    <LockIcon />
+                  </span>
+                  <input
+                    id="password"
+                    type={showPassword ? 'text' : 'password'}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder={mode === 'login' ? '••••••••' : 'min. 8 characters'}
+                    className={`${INPUT_CLASS} pl-9 pr-9`}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((v) => !v)}
+                    aria-label={showPassword ? 'Hide password' : 'Show password'}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-text-secondary transition-colors hover:text-text-primary"
+                  >
+                    <EyeIcon open={showPassword} />
+                  </button>
+                </div>
+              </div>
+
+              {error && (
+                <p className="rounded-lg border border-severity-critical/30 bg-severity-critical/10 px-3 py-2 text-xs text-severity-critical">
+                  {error}
+                </p>
+              )}
+
               <Button
-                type="button"
-                variant="outline"
+                type="submit"
                 size="lg"
-                disabled={pending}
+                disabled={pending || !email || !password}
                 className="w-full"
-                onClick={() =>
-                  void authenticate('login', { email: DEMO_EMAIL, password: DEMO_PASSWORD })
-                }
               >
-                Explore the live demo
+                {pending ? 'Checking…' : mode === 'login' ? 'Sign in' : 'Create account'}
               </Button>
-              <p className="mt-2 text-center font-mono text-[10px] text-text-secondary">
-                read-only account — fire attacks from the simulator, watch them land
-              </p>
-            </>
-          )}
+            </form>
 
-          {googleEnabled && (
-            <>
-              <div className="my-5 flex items-center gap-3 font-mono text-[10px] uppercase tracking-wider text-text-secondary">
-                <span className="h-px flex-1 bg-border-subtle" />
-                or continue with
-                <span className="h-px flex-1 bg-border-subtle" />
-              </div>
-              <div id={GOOGLE_BUTTON_ELEMENT_ID} className="flex justify-center" />
-            </>
+            {DEMO_EMAIL && DEMO_PASSWORD && mode === 'login' && (
+              <>
+                <div className="my-5 flex items-center gap-3 font-mono text-[10px] uppercase tracking-wider text-text-secondary">
+                  <span className="h-px flex-1 bg-border-subtle" />
+                  just looking?
+                  <span className="h-px flex-1 bg-border-subtle" />
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="lg"
+                  disabled={pending}
+                  className="w-full"
+                  onClick={() =>
+                    void authenticate('login', { email: DEMO_EMAIL, password: DEMO_PASSWORD })
+                  }
+                >
+                  Explore the live demo
+                </Button>
+                <p className="mt-2 text-center font-mono text-[10px] text-text-secondary">
+                  read-only account — fire attacks from the simulator, watch them land
+                </p>
+              </>
+            )}
+
+            {googleEnabled && (
+              <>
+                <div className="my-5 flex items-center gap-3 font-mono text-[10px] uppercase tracking-wider text-text-secondary">
+                  <span className="h-px flex-1 bg-border-subtle" />
+                  or continue with
+                  <span className="h-px flex-1 bg-border-subtle" />
+                </div>
+                <div id={GOOGLE_BUTTON_ELEMENT_ID} className="flex justify-center" />
+              </>
+            )}
+          </div>
+
+          {registrationOpen && (
+            <p className="mt-6 text-center font-mono text-xs text-text-secondary">
+              {mode === 'login' ? (
+                <>
+                  Don&apos;t have an account?{' '}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMode('register');
+                      setError(null);
+                    }}
+                    className="text-accent hover:underline"
+                  >
+                    Sign up
+                  </button>
+                </>
+              ) : (
+                <>
+                  Already have an account?{' '}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMode('login');
+                      setError(null);
+                    }}
+                    className="text-accent hover:underline"
+                  >
+                    Sign in
+                  </button>
+                </>
+              )}
+            </p>
           )}
         </div>
-
-        {registrationOpen && (
-          <p className="mt-6 text-center font-mono text-xs text-text-secondary">
-            {mode === 'login' ? (
-              <>
-                Don&apos;t have an account?{' '}
-                <button
-                  type="button"
-                  onClick={() => {
-                    setMode('register');
-                    setError(null);
-                  }}
-                  className="text-accent hover:underline"
-                >
-                  Sign up
-                </button>
-              </>
-            ) : (
-              <>
-                Already have an account?{' '}
-                <button
-                  type="button"
-                  onClick={() => {
-                    setMode('login');
-                    setError(null);
-                  }}
-                  className="text-accent hover:underline"
-                >
-                  Sign in
-                </button>
-              </>
-            )}
-          </p>
-        )}
       </div>
     </main>
   );
