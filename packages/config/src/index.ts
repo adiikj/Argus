@@ -81,8 +81,17 @@ const EnvSchema = z.object({
   // blank to run email+password only (same optional-degradation as LLM_PROVIDER)
   GOOGLE_CLIENT_ID: z.string().optional(),
 
-  // '*' for local dev; set to the real dashboard hostname once one exists (post-deploy)
-  CORS_ORIGIN: z.string().default('*'),
+  // '*' for local dev; on a deployment, the dashboard origin(s) as a comma list,
+  // e.g. https://argus.vercel.app,https://argus.example.com
+  CORS_ORIGIN: z
+    .string()
+    .default('*')
+    .transform((s) =>
+      s
+        .split(',')
+        .map((origin) => origin.trim().replace(/\/$/, ''))
+        .filter(Boolean),
+    ),
 
   TRUST_PROXY: TrustProxy,
 

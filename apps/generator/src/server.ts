@@ -12,7 +12,7 @@ const SIMULATE_LIMITER = new RateLimiter(5, 0.2);
 export interface SimulatorDeps {
   port: number;
   log: Logger;
-  corsOrigin?: string;
+  corsOrigins?: string[]; // see CORS_ORIGIN in @argus/config
   // see TRUST_PROXY in @argus/config — decides what req.ip (the rate-limit key) is
   trustProxy?: AppConfig['TRUST_PROXY'];
   // returns how many raw logs the scenario emitted
@@ -20,16 +20,30 @@ export interface SimulatorDeps {
 }
 
 // The attack-simulator trigger API (architecture §15). Kept deliberately small:
-// list the scenarios, fire one, and a healthcheck. Permissive CORS so the
-// dashboard control panel (a different origin, Day 10) can call it.
+// list the scenarios, fire one, and a healthcheck. CORS open to CORS_ORIGIN so
+// the dashboard control panel (a different origin, Day 10) can call it.
 export async function createSimulatorServer(deps: SimulatorDeps) {
   const app = Fastify({ trustProxy: deps.trustProxy ?? false });
 
+  const corsOrigins = deps.corsOrigins ?? ['*'];
+
   app.addHook('onRequest', async (req, reply) => {
-    reply.header('access-control-allow-origin', deps.corsOrigin ?? '*');
+    reply
+      .header('x-content-type-options', 'nosniff')
+      .header('x-frame-options', 'DENY')
+      .header('referrer-policy', 'no-referrer')
+      .header('vary', 'origin');
+
+    // Access-Control-Allow-Origin takes exactly one origin — reflect the
+    // caller's only when it's on the list
+    const origin = req.headers.origin;
+    if (corsOrigins.includes('*')) reply.header('access-control-allow-origin', '*');
+    else if (origin && corsOrigins.includes(origin)) {
+      reply.header('access-control-allow-origin', origin);
+    }
     reply.header('access-control-allow-methods', 'GET, POST, OPTIONS');
     reply.header('access-control-allow-headers', 'content-type');
-    if (req.method === 'OPTIONS') reply.code(204).send();
+    if (req.method === 'OPTIONS') return reply.code(204).send();
   });
 
   app.get('/healthz', async () => ({ status: 'ok' }));

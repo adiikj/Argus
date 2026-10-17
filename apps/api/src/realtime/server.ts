@@ -48,7 +48,7 @@ export interface RealtimeOptions {
   getEventTrace?: (eventId: string) => Promise<EventTrace>;
   getSystemHealth?: () => Promise<SystemHealth>;
   auth: AuthService;
-  corsOrigin?: string;
+  corsOrigins?: string[]; // see CORS_ORIGIN in @argus/config
   // see TRUST_PROXY in @argus/config — decides what req.ip (the rate-limit key) is
   trustProxy?: AppConfig['TRUST_PROXY'];
 }
@@ -57,12 +57,36 @@ export async function createRealtimeServer(bus: Bus, port: number, opts: Realtim
   const app = Fastify({ trustProxy: opts.trustProxy ?? false });
   await app.register(websocketPlugin);
 
-  const corsOrigin = opts.corsOrigin ?? '*';
+  const corsOrigins = opts.corsOrigins ?? ['*'];
+  // Access-Control-Allow-Origin takes exactly one origin, so reflect the
+  // caller's only when it's on the list (and say so with Vary for caches).
+  const allowedOrigin = (origin: string | undefined): string | undefined => {
+    if (corsOrigins.includes('*')) return '*';
+    return origin && corsOrigins.includes(origin) ? origin : undefined;
+  };
+
   // every early response below does `return reply` — in an async hook that's
   // what tells Fastify the request is finished; without it the remaining hooks
   // (and the route handler) still run after a 429/401/403 was already sent.
   app.addHook('onRequest', async (req, reply) => {
-    reply.header('access-control-allow-origin', corsOrigin);
+    reply
+      .header('x-content-type-options', 'nosniff')
+      .header('x-frame-options', 'DENY')
+      .header('referrer-policy', 'no-referrer')
+      .header('cache-control', 'no-store') // live security data — nothing worth caching
+      .header('vary', 'origin');
+
+    const origin = req.headers.origin;
+    const allowed = allowedOrigin(origin);
+    if (allowed) reply.header('access-control-allow-origin', allowed);
+
+    // CORS doesn't cover WebSockets — any site can open one to us. Bearer
+    // tokens (not cookies) already make cross-site socket hijacking useless,
+    // but there's no reason to accept a handshake from a foreign page either.
+    if (req.url.startsWith('/ws') && origin && !allowed) {
+      return reply.code(403).send({ error: 'origin not allowed' });
+    }
+
     // browsers preflight any POST with a JSON body (auth/login etc. all
     // qualify) — Fastify has no route for OPTIONS, so without this it 404s
     // and the preflight (and therefore the real request) is rejected.

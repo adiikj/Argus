@@ -37,4 +37,7 @@ COPY --from=prod-deps /app .
 COPY --from=pruner /app/out/full/ .
 COPY --from=installer /app/apps/generator/dist ./apps/generator/dist
 EXPOSE 4200
+# drop root: the image's files stay root-owned (read-only to the process), and a
+# compromised process can't rewrite its own code or install anything.
+USER node
 CMD ["node", "apps/generator/dist/index.js"]

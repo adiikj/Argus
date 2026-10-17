@@ -28,12 +28,13 @@ afterEach(async () => {
   app = undefined;
 });
 
-async function start(auth: AuthService) {
+async function start(auth: AuthService, corsOrigins?: string[]) {
   const patchIncident = vi.fn(async () => ({ ok: false as const, error: 'not_found' as const }));
   app = await createRealtimeServer(createBus(), 0, {
     auth,
     patchIncident,
     listUsers: async () => [],
+    corsOrigins,
   });
   return { app, patchIncident };
 }
@@ -87,5 +88,40 @@ describe('api auth gate', () => {
       payload: { email: 'new@example.com', password: 'long-enough-pw' },
     });
     expect(res.statusCode).toBe(403);
+  });
+});
+
+describe('api CORS + origin checks', () => {
+  const DASHBOARD = 'https://argus.example.com';
+  const open = () => stubAuth({ required: false, registrationOpen: true });
+
+  it('reflects only listed origins', async () => {
+    const { app } = await start(open(), [DASHBOARD, 'https://argus.vercel.app']);
+    const ok = await app.inject({ url: '/healthz', headers: { origin: DASHBOARD } });
+    expect(ok.headers['access-control-allow-origin']).toBe(DASHBOARD);
+    expect(ok.headers['vary']).toContain('origin');
+
+    const foreign = await app.inject({ url: '/healthz', headers: { origin: 'https://evil.test' } });
+    expect(foreign.headers['access-control-allow-origin']).toBeUndefined();
+  });
+
+  it('refuses a WebSocket handshake from a foreign page', async () => {
+    const { app } = await start(open(), [DASHBOARD]);
+    const res = await app.inject({ url: '/ws', headers: { origin: 'https://evil.test' } });
+    expect(res.statusCode).toBe(403);
+  });
+
+  it("allows any origin with '*' (local dev)", async () => {
+    const { app } = await start(open(), ['*']);
+    const res = await app.inject({ url: '/healthz', headers: { origin: 'http://localhost:3000' } });
+    expect(res.headers['access-control-allow-origin']).toBe('*');
+  });
+
+  it('sends baseline security headers', async () => {
+    const { app } = await start(open());
+    const res = await app.inject({ url: '/healthz' });
+    expect(res.headers['x-content-type-options']).toBe('nosniff');
+    expect(res.headers['x-frame-options']).toBe('DENY');
+    expect(res.headers['cache-control']).toBe('no-store');
   });
 });

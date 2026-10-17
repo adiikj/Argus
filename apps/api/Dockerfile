@@ -43,4 +43,7 @@ COPY --from=pruner /app/out/full/ .
 COPY --from=installer /app/apps/api/dist ./apps/api/dist
 COPY --from=installer /app/apps/api/generated ./apps/api/generated
 EXPOSE 4000
+# drop root: the image's files stay root-owned (read-only to the process), and a
+# compromised process can't rewrite its own code or install anything.
+USER node
 CMD ["node", "apps/api/dist/index.js"]
