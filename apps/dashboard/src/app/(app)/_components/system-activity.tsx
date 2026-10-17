@@ -24,7 +24,7 @@ export function SystemActivity() {
       <CardHeader className="flex-row items-center justify-between border-b border-border-subtle pb-3">
         <div>
           <CardTitle>System activity</CardTitle>
-          <CardDescription>Stage-by-stage events for attacking sources</CardDescription>
+          <CardDescription>Attacking sources, stage by stage</CardDescription>
         </div>
         <span className="relative flex h-2 w-2">
           <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-accent opacity-50" />

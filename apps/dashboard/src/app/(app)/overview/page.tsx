@@ -260,7 +260,7 @@ export default function OverviewPage() {
           value={fmt(metrics?.eventsNormalized)}
           icon={Activity}
           trend={history.map((p) => p.events)}
-          hint="normalized from raw logs"
+          hint="normalized"
         />
         <StatTile
           label="Alerts raised"
@@ -287,7 +287,7 @@ export default function OverviewPage() {
           label="Noise suppressed"
           value={fmt(metrics?.alertsSuppressed)}
           icon={Filter}
-          hint="repeat alerts held back by throttling"
+          hint="held back by throttling"
         />
       </motion.div>
 
@@ -297,7 +297,7 @@ export default function OverviewPage() {
             <CardHeader className="flex-row items-start justify-between">
               <div>
                 <CardTitle>Pipeline throughput</CardTitle>
-                <CardDescription>Events and alerts per 3 s interval, this session</CardDescription>
+                <CardDescription>Events and alerts, this session</CardDescription>
               </div>
               <div className="flex items-center gap-3 font-mono text-[11px] text-text-secondary">
                 <span className="flex items-center gap-1.5">

@@ -135,7 +135,7 @@ export function AttackerGeoMap() {
         <CardDescription>
           {pins.length === 0
             ? 'Where incidents originate.'
-            : `${realPins} real (GeoIP, country level) · ${simulatedPins} simulated (demo traffic from documentation IP ranges)`}
+            : `${realPins} real · ${simulatedPins} simulated`}
         </CardDescription>
       </CardHeader>
       <CardContent>
