@@ -45,6 +45,15 @@ describe('InMemoryBaselineStore', () => {
     expect(sample!.zScore).toBeGreaterThan(3);
   });
 
+  it('ignores buckets older than the history window (history is by time, not by count)', async () => {
+    const store = new InMemoryBaselineStore();
+    for (let i = 0; i < 5; i += 1) await store.observe('ip', BUCKET_MS, 3, 0); // busy bucket 0
+    // 10 buckets later, far outside a 3-bucket history: judged against zero,
+    // not against that stale busy bucket
+    const sample = await store.observe('ip', BUCKET_MS, 3, 10_000);
+    expect(sample.zScore).toBe(Number.POSITIVE_INFINITY);
+  });
+
   it('keeps baselines independent per key', async () => {
     const store = new InMemoryBaselineStore();
     for (let i = 0; i < 5; i += 1) await store.observe('busy', BUCKET_MS, 3, i);

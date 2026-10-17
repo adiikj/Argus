@@ -40,8 +40,11 @@ function padHistory(history: number[], historyBuckets: number): number[] {
   return [...history, ...Array<number>(historyBuckets - history.length).fill(0)];
 }
 
+const SWEEP_INTERVAL_MS = 60_000;
+
 export class InMemoryBaselineStore implements BaselineStore {
-  private readonly series = new Map<string, Bucket[]>();
+  private readonly series = new Map<string, { buckets: Bucket[]; spanMs: number }>();
+  private lastSweep = 0;
 
   async observe(
     key: string,
@@ -49,8 +52,15 @@ export class InMemoryBaselineStore implements BaselineStore {
     historyBuckets: number,
     now: number = Date.now(),
   ): Promise<BaselineSample> {
+    this.sweep(now);
     const bucketStart = Math.floor(now / bucketMs) * bucketMs;
-    const buckets = this.series.get(key) ?? [];
+    // history is by *time*, like the Redis backend: only buckets inside the
+    // trailing historyBuckets window count — an entity last seen 10 minutes
+    // ago isn't judged against those stale buckets as if they were recent
+    const oldestKept = bucketStart - historyBuckets * bucketMs;
+    const buckets = (this.series.get(key)?.buckets ?? []).filter(
+      (b) => b.bucketStart >= oldestKept,
+    );
 
     let current = buckets[buckets.length - 1];
     if (!current || current.bucketStart !== bucketStart) {
@@ -58,13 +68,20 @@ export class InMemoryBaselineStore implements BaselineStore {
       buckets.push(current);
     }
     current.count += 1;
+    this.series.set(key, { buckets, spanMs: (historyBuckets + 1) * bucketMs });
 
-    // keep only the current bucket plus up to `historyBuckets` before it
-    const trimmed = buckets.slice(-(historyBuckets + 1));
-    this.series.set(key, trimmed);
-
-    const history = trimmed.slice(0, -1).map((b) => b.count);
+    const history = buckets.slice(0, -1).map((b) => b.count);
     return score(current.count, padHistory(history, historyBuckets));
+  }
+
+  // the in-memory twin of the Redis backend's key TTL
+  private sweep(now: number): void {
+    if (now - this.lastSweep < SWEEP_INTERVAL_MS) return;
+    this.lastSweep = now;
+    for (const [key, { buckets, spanMs }] of this.series) {
+      const newest = buckets.at(-1)?.bucketStart ?? 0;
+      if (newest <= now - spanMs) this.series.delete(key);
+    }
   }
 }
 
@@ -105,4 +122,12 @@ export class RedisBaselineStore implements BaselineStore {
 
     return score(count, padHistory(history, historyBuckets));
   }
+}
+
+// per-rule key namespace — see scopedWindowStore
+export function scopedBaselineStore(store: BaselineStore, scope: string): BaselineStore {
+  return {
+    observe: (key, bucketMs, historyBuckets, now) =>
+      store.observe(`${scope}:${key}`, bucketMs, historyBuckets, now),
+  };
 }

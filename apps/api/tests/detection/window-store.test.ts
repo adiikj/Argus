@@ -24,6 +24,32 @@ describe('InMemoryWindowStore', () => {
   });
 });
 
+describe('InMemoryWindowStore set semantics + peek', () => {
+  it('refreshes a re-recorded member instead of duplicating it (like Redis ZADD)', async () => {
+    const store = new InMemoryWindowStore();
+    await store.record('ip', 'alice', 1000, 0);
+    await store.record('ip', 'bob', 1000, 100);
+    const entries = await store.record('ip', 'alice', 1000, 200);
+    expect(entries.map((e) => e.eventId)).toEqual(['bob', 'alice']);
+  });
+
+  it('peeks without recording', async () => {
+    const store = new InMemoryWindowStore();
+    await store.record('ip', 'e1', 1000, 0);
+    expect(await store.peek('ip', 1000, 500)).toHaveLength(1);
+    expect(await store.peek('ip', 1000, 500)).toHaveLength(1);
+    expect(await store.peek('ip', 1000, 2000)).toHaveLength(0);
+    expect(await store.peek('never-seen', 1000, 0)).toEqual([]);
+  });
+
+  it('forgets idle keys after the sweep interval', async () => {
+    const store = new InMemoryWindowStore();
+    await store.record('idle', 'e1', 1000, 0);
+    await store.record('busy', 'e2', 1000, 61_000); // past the 60s sweep interval
+    expect(await store.peek('idle', 10_000_000, 61_000)).toEqual([]); // swept, not just filtered
+  });
+});
+
 describe('SeenEventIds', () => {
   it('reports an id as seen only on subsequent checks', () => {
     const seen = new SeenEventIds(1000);
