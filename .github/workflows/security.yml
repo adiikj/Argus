@@ -1,0 +1,87 @@
+name: Security
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  # new CVEs land without any code change — rescan weekly
+  schedule:
+    - cron: '23 4 * * 1'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: security-${{ github.ref }}
+  cancel-in-progress: true
+
+# Scanners are the official release binaries pinned by SHA-256 rather than
+# third-party actions referenced by a mutable tag: a re-pointed tag can't
+# swap the code that runs here. Bump a version = update its checksum too
+# (from the release's *_checksums.txt).
+env:
+  TRIVY_VERSION: 0.75.0
+  TRIVY_SHA256: c6e65abddb348e25f10549df887045629cf28cc72453cd1c63acb717316b3f3f
+  GITLEAKS_VERSION: 8.30.1
+  GITLEAKS_SHA256: 551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb
+
+jobs:
+  secrets:
+    name: Secret scan (gitleaks, full history)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # every commit, not just the tip
+          persist-credentials: false
+      - name: Install gitleaks (checksum-pinned)
+        run: |
+          curl -sSfLo gitleaks.tgz "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          echo "${GITLEAKS_SHA256}  gitleaks.tgz" | sha256sum -c -
+          tar xzf gitleaks.tgz gitleaks && rm gitleaks.tgz
+      - name: Scan
+        run: ./gitleaks git . --redact --no-banner --exit-code 1
+
+  vulnerabilities:
+    name: Dependencies, Dockerfiles, SBOM (Trivy)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      security-events: write # upload SARIF to the Security tab
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Install trivy (checksum-pinned)
+        run: |
+          curl -sSfLo trivy.tgz "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz"
+          echo "${TRIVY_SHA256}  trivy.tgz" | sha256sum -c -
+          tar xzf trivy.tgz trivy && rm trivy.tgz
+
+      # full picture (HIGH+CRITICAL vulns, leaked secrets, Dockerfile/compose
+      # misconfig) -> Security tab. Report-only; the gate is the next step.
+      - name: Scan (report)
+        run: |
+          ./trivy fs . --scanners vuln,secret,misconfig --severity HIGH,CRITICAL \
+            --ignore-unfixed --format sarif --output trivy.sarif
+      - name: Upload to code scanning
+        uses: github/codeql-action/upload-sarif@v3
+        # code scanning needs a public repo (or GitHub Advanced Security)
+        continue-on-error: true
+        with:
+          sarif_file: trivy.sarif
+          category: trivy
+
+      # fail on anything critical that has a fix available. Accepted risks live
+      # in .trivyignore, each with a reason and an expiry date.
+      - name: Gate on fixable critical vulnerabilities
+        run: ./trivy fs . --scanners vuln --severity CRITICAL --ignore-unfixed --exit-code 1
+
+      - name: Generate SBOM (CycloneDX)
+        run: ./trivy fs . --format cyclonedx --output sbom.cdx.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sbom-cyclonedx
+          path: sbom.cdx.json

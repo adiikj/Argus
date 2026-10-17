@@ -1,0 +1,32 @@
+version: 2
+
+# weekly, grouped — one PR per ecosystem instead of a drip of single bumps.
+# Security updates (Dependabot alerts) still open immediately, outside these groups.
+updates:
+  - package-ecosystem: npm # covers the pnpm workspace + pnpm-lock.yaml
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      minor-and-patch:
+        update-types: [minor, patch]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ['*']
+
+  - package-ecosystem: docker
+    directories:
+      - /apps/api
+      - /apps/generator
+      - /apps/dashboard
+    schedule:
+      interval: weekly
+    groups:
+      base-images:
+        patterns: ['*']
