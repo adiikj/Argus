@@ -18,7 +18,7 @@ export function AttackTechnique({
 }) {
   const info = ruleInfo(ruleId);
   if (!info) return null;
-  const title = `MITRE ATT&CK ${info.technique.id} — ${info.technique.name} (${info.tactic.name})`;
+  const title = `MITRE ATT&CK ${info.technique.id}: ${info.technique.name} (${info.tactic.name})`;
 
   if (!link) {
     return (

@@ -69,7 +69,7 @@ export default function CoveragePage() {
     <main className="mx-auto max-w-[1400px] px-4 py-8 sm:px-6 lg:px-8">
       <PageHeader
         title="Detection Coverage"
-        description={`What Argus can detect, in MITRE ATT&CK terms — straight from the rule catalog the engine runs, so this page can't drift from reality.`}
+        description="Every detection rule and the ATT&CK technique it maps to."
       />
       <div className="mb-8 grid grid-cols-3 gap-4">
         {[
@@ -78,7 +78,7 @@ export default function CoveragePage() {
           [tactics.size, 'tactics covered'],
         ].map(([value, label]) => (
           <Card key={String(label)} className="px-5 py-4">
-            <div className="text-gradient font-mono text-3xl font-semibold">{value}</div>
+            <div className="text-3xl font-semibold text-text-primary">{value}</div>
             <div className="mt-1 text-[12px] text-text-secondary">{label}</div>
           </Card>
         ))}

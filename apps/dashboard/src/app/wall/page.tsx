@@ -60,14 +60,7 @@ export default function WallPage() {
 
   return (
     <div className="h-screen w-screen overflow-hidden bg-bg-base text-text-primary">
-      <div
-        aria-hidden
-        className="bg-grid mask-radial pointer-events-none fixed inset-0 opacity-50"
-      />
-      <div
-        aria-hidden
-        className="pointer-events-none fixed inset-x-0 top-0 h-96 bg-[radial-gradient(60%_100%_at_50%_0%,color-mix(in_srgb,var(--color-accent)_8%,transparent),transparent)]"
-      />
+      <div aria-hidden className="bg-grid pointer-events-none fixed inset-0" />
 
       <div className="relative flex h-full flex-col gap-4 p-6">
         <header className="flex items-center justify-between">

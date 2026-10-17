@@ -27,9 +27,7 @@ function LivePill() {
       <span
         className={cn(
           'h-1.5 w-1.5 rounded-full',
-          connected
-            ? 'bg-severity-ok shadow-[0_0_8px_var(--color-severity-ok)]'
-            : 'bg-severity-info',
+          connected ? 'bg-severity-ok' : 'bg-severity-info',
         )}
       />
       <span className="font-mono text-[11px] text-text-secondary">
@@ -63,9 +61,6 @@ function TopBar({ onMenu }: { onMenu: () => void }) {
           <span className="text-text-muted">Argus</span>
           <span className="text-text-muted">/</span>
           <span className="truncate font-medium text-text-primary">{item?.label ?? 'Console'}</span>
-          {item && (
-            <span className="hidden truncate text-text-muted xl:inline">— {item.description}</span>
-          )}
         </div>
 
         <div className="ml-auto flex items-center gap-2">
@@ -107,13 +102,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <div className="relative flex min-h-screen bg-bg-base">
-      {/* ambient brand glow behind the whole console */}
-      <div
-        aria-hidden
-        className="pointer-events-none fixed inset-x-0 top-0 -z-0 h-[420px] bg-[radial-gradient(60%_100%_at_50%_0%,color-mix(in_srgb,var(--color-accent)_7%,transparent),transparent)]"
-      />
-
-      <aside className="sticky top-0 z-20 hidden h-screen w-60 shrink-0 border-r border-border-subtle bg-bg-panel/80 lg:block">
+      <aside className="sticky top-0 z-20 hidden h-screen w-60 shrink-0 border-r border-border-subtle bg-bg-panel lg:block">
         <NavSidebar />
       </aside>
 

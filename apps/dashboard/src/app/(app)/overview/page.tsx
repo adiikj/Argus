@@ -74,13 +74,7 @@ function StatTile({
   accent?: boolean;
 }) {
   return (
-    <Card
-      className={cn(
-        'overflow-hidden',
-        accent &&
-          'border-accent/25 shadow-[0_0_0_1px_color-mix(in_srgb,var(--color-accent)_10%,transparent),0_12px_40px_-16px_var(--color-accent)]',
-      )}
-    >
+    <Card className={cn('overflow-hidden', accent && 'border-accent/40')}>
       <CardContent className="p-5">
         <div className="flex items-center justify-between">
           <span className="text-[12px] font-medium text-text-secondary">{label}</span>
@@ -184,10 +178,7 @@ function HourHeatmap({ hourly }: { hourly: number[] }) {
               style={{
                 height: `${Math.max(4, (count / max) * 100)}%`,
                 opacity: count > 0 ? 0.45 + (count / max) * 0.55 : 0.25,
-                background:
-                  count > 0
-                    ? 'linear-gradient(180deg, var(--color-accent), color-mix(in srgb, var(--color-accent-2) 70%, transparent))'
-                    : 'var(--color-bg-hover)',
+                background: count > 0 ? 'var(--color-accent)' : 'var(--color-bg-hover)',
               }}
             />
           </div>
@@ -211,7 +202,7 @@ export default function OverviewPage() {
 
   const fmt = (n: number | undefined): string | null => {
     if (metrics) return (n ?? 0).toLocaleString();
-    return isError ? '—' : null;
+    return isError ? '-' : null;
   };
 
   const severityCounts = useMemo(() => {
@@ -246,7 +237,7 @@ export default function OverviewPage() {
     <main className="mx-auto max-w-[1400px] px-4 py-8 sm:px-6 lg:px-8">
       <PageHeader
         title="Overview"
-        description="The live state of the pipeline — what's flowing through it, what it caught, and where it came from."
+        description="What the pipeline is seeing right now."
         actions={
           <>
             {isError && <Badge variant="critical">api unreachable</Badge>}
@@ -321,24 +312,6 @@ export default function OverviewPage() {
               {hasActivity ? (
                 <ResponsiveContainer width="100%" height="100%">
                   <AreaChart data={history} margin={{ top: 6, right: 6, left: -8, bottom: 0 }}>
-                    <defs>
-                      <linearGradient id="evGrad" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="var(--color-accent)" stopOpacity={0.3} />
-                        <stop offset="100%" stopColor="var(--color-accent)" stopOpacity={0} />
-                      </linearGradient>
-                      <linearGradient id="alGrad" x1="0" y1="0" x2="0" y2="1">
-                        <stop
-                          offset="0%"
-                          stopColor="var(--color-severity-high)"
-                          stopOpacity={0.3}
-                        />
-                        <stop
-                          offset="100%"
-                          stopColor="var(--color-severity-high)"
-                          stopOpacity={0}
-                        />
-                      </linearGradient>
-                    </defs>
                     <CartesianGrid
                       stroke="var(--color-border-subtle)"
                       strokeDasharray="3 5"
@@ -366,7 +339,8 @@ export default function OverviewPage() {
                       type="monotone"
                       dataKey="events"
                       stroke="var(--color-accent)"
-                      fill="url(#evGrad)"
+                      fill="var(--color-accent)"
+                      fillOpacity={0.08}
                       strokeWidth={2}
                       isAnimationActive={false}
                     />
@@ -374,7 +348,8 @@ export default function OverviewPage() {
                       type="monotone"
                       dataKey="alerts"
                       stroke="var(--color-severity-high)"
-                      fill="url(#alGrad)"
+                      fill="var(--color-severity-high)"
+                      fillOpacity={0.08}
                       strokeWidth={2}
                       isAnimationActive={false}
                     />
@@ -496,7 +471,7 @@ export default function OverviewPage() {
                       </span>
                       <div className="col-span-2 h-1.5 overflow-hidden rounded-full bg-bg-elevated">
                         <div
-                          className="bg-brand h-full rounded-full"
+                          className="h-full rounded-full bg-accent"
                           style={{
                             width: `${(count / maxRule) * 100}%`,
                             opacity: 0.35 + (count / maxRule) * 0.65,

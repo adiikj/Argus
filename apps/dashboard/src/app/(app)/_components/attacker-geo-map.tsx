@@ -144,13 +144,6 @@ export function AttackerGeoMap() {
           style={{ aspectRatio: `${W} / ${H}` }}
         >
           <svg viewBox={`0 0 ${W} ${H}`} className="absolute inset-0 h-full w-full">
-            <defs>
-              <radialGradient id="pin-glow">
-                <stop offset="0%" stopColor="white" stopOpacity={0.55} />
-                <stop offset="100%" stopColor="white" stopOpacity={0} />
-              </radialGradient>
-            </defs>
-
             {/* land as a dot matrix */}
             <path
               d={WORLD_DOTS}
@@ -188,7 +181,7 @@ export function AttackerGeoMap() {
               return (
                 <g key={pinKey(pin)}>
                   <title>
-                    {`${pin.city ? `${pin.city}, ` : ''}${pin.countryName}${pin.source === 'simulated' ? ' (simulated)' : ''} — ${pin.count} incident${pin.count === 1 ? '' : 's'} (${pin.severity})`}
+                    {`${pin.city ? `${pin.city}, ` : ''}${pin.countryName}${pin.source === 'simulated' ? ' (simulated)' : ''}: ${pin.count} incident${pin.count === 1 ? '' : 's'} (${pin.severity})`}
                   </title>
                   <circle cx={x} cy={y} r={r * 2.6} fill={color} opacity={0.12} />
                   {pin.source === 'dbip' ? (
@@ -216,7 +209,7 @@ export function AttackerGeoMap() {
 
             {/* Argus — where every arc lands */}
             <g>
-              <title>Argus — monitored infrastructure</title>
+              <title>Argus</title>
               <motion.circle
                 key={pulse}
                 cx={target.x}

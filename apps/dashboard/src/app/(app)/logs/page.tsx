@@ -98,7 +98,7 @@ export default function LogsPage() {
     <main className="mx-auto max-w-[1400px] px-4 py-8 sm:px-6 lg:px-8">
       <PageHeader
         title="Log Explorer"
-        description="Full-text search over the normalized event stream. Open any event to trace it through the pipeline — parse, detection, incident."
+        description="Search every event. Open one to trace it through the pipeline."
       />
 
       <div className="mb-4 flex gap-2">
@@ -184,7 +184,7 @@ export default function LogsPage() {
       ) : isError ? (
         <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed border-border-subtle py-24 text-center">
           <p className="text-sm text-text-secondary">
-            Couldn&apos;t reach the api — search is unavailable right now.
+            Couldn&apos;t reach the api, so search is unavailable.
           </p>
         </div>
       ) : sortedEvents && sortedEvents.length > 0 ? (

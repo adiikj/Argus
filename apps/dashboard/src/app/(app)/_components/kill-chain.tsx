@@ -72,7 +72,7 @@ export function KillChain({ alerts }: { alerts: Alert[] }) {
                   <span className="flex max-w-[8rem] flex-wrap justify-center gap-1 text-[11px] leading-snug text-text-secondary">
                     {hit
                       ? rules.map((ruleId) => <AttackTechnique key={ruleId} ruleId={ruleId} link />)
-                      : '—'}
+                      : '-'}
                   </span>
                 </div>
                 {i < STAGE_ORDER.length - 1 && (

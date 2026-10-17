@@ -52,7 +52,7 @@ export function SystemActivity() {
                     {entry.stage}
                   </span>
                   <span className="shrink-0 truncate text-text-primary">{entry.entity}</span>
-                  <span className="truncate text-text-secondary">— {entry.label}</span>
+                  <span className="truncate text-text-secondary">{entry.label}</span>
                 </motion.li>
               ))}
             </AnimatePresence>

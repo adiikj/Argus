@@ -44,7 +44,7 @@ export default function SimulatorPage() {
     <main className="mx-auto max-w-[1400px] px-4 py-8 sm:px-6 lg:px-8">
       <PageHeader
         title="Attack Simulator"
-        description="Fire a scenario at the live pipeline and watch it move stage by stage — then open Alerts for the incident and AI summary it produced."
+        description="Fire an attack at the live pipeline and watch it land."
       />
 
       <div className="mb-6 grid gap-4 lg:grid-cols-3">
@@ -57,7 +57,7 @@ export default function SimulatorPage() {
       {isLoading && <p className="text-sm text-text-secondary">Loading scenarios…</p>}
       {isError && (
         <p className="text-sm text-text-secondary">
-          Couldn&apos;t reach the generator — is it running on{' '}
+          Couldn&apos;t reach the generator. Is it running on{' '}
           <code className="font-mono text-xs">NEXT_PUBLIC_GENERATOR_URL</code>?
         </p>
       )}
@@ -81,7 +81,7 @@ function ScenarioCard({ scenario }: { scenario: ScenarioInfo }) {
   const launch = (): void => {
     mutate(scenario.name, {
       onSuccess: (result) =>
-        push(`${scenario.name} fired — ${result.emitted} events emitted`, 'success'),
+        push(`${scenario.name} fired: ${result.emitted} events emitted`, 'success'),
       onError: () => push(`${scenario.name} failed to fire`, 'error'),
     });
   };

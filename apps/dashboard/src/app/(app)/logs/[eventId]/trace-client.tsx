@@ -43,7 +43,7 @@ function Stage({
               : 'border-border-subtle text-text-secondary',
           )}
         >
-          {reached ? '✓' : '—'}
+          {reached ? '✓' : '-'}
         </span>
         {!last && <span className="mt-1 w-px flex-1 bg-border-subtle" />}
       </div>

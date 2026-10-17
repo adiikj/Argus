@@ -1,4 +1,3 @@
-import { useId } from 'react';
 import { cn } from '@/lib/utils';
 
 // tiny inline trend line — no axes, no library; scales the series to its box
@@ -11,7 +10,6 @@ export function Sparkline({
   color?: string;
   className?: string;
 }) {
-  const id = useId();
   const points = data.length > 1 ? data : [0, 0];
   const max = Math.max(1, ...points);
   const step = 100 / (points.length - 1);
@@ -27,13 +25,7 @@ export function Sparkline({
       className={cn('h-8 w-full overflow-visible', className)}
       aria-hidden
     >
-      <defs>
-        <linearGradient id={id} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor={color} stopOpacity={0.28} />
-          <stop offset="100%" stopColor={color} stopOpacity={0} />
-        </linearGradient>
-      </defs>
-      <path d={`${line} L100,30 L0,30 Z`} fill={`url(#${id})`} />
+      <path d={`${line} L100,30 L0,30 Z`} fill={color} fillOpacity={0.1} />
       <path
         d={line}
         fill="none"

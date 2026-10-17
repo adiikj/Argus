@@ -1,13 +1,28 @@
 import type { ReactNode } from 'react';
 import type { Metadata } from 'next';
-import { GeistSans } from 'geist/font/sans';
-import { GeistMono } from 'geist/font/mono';
+import { IBM_Plex_Mono, IBM_Plex_Sans } from 'next/font/google';
 import { Providers } from './providers';
 import './globals.css';
 
-const TITLE = 'Argus — AI-powered security event analysis';
+// IBM Plex, the type family IBM designed for its own products: Sans for
+// interface text, Mono for data. next/font self-hosts the files at
+// build time, so the CSP's font-src 'self' holds.
+const plexSans = IBM_Plex_Sans({
+  subsets: ['latin'],
+  weight: ['400', '500', '600', '700'],
+  variable: '--font-plex-sans',
+  display: 'swap',
+});
+const plexMono = IBM_Plex_Mono({
+  subsets: ['latin'],
+  weight: ['400', '500', '600'],
+  variable: '--font-plex-mono',
+  display: 'swap',
+});
+
+const TITLE = 'Argus: security event analysis';
 const DESCRIPTION =
-  'Argus ingests a live stream of security events, detects threats, correlates them into incidents, and explains each one in plain language — on a real-time console.';
+  'Argus streams security logs, detects attacks with rules mapped to MITRE ATT&CK, groups alerts into incidents and explains each one in plain language.';
 
 export const metadata: Metadata = {
   // resolves relative OG/twitter image paths to absolute URLs — set
@@ -33,7 +48,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="en" className={`${GeistSans.variable} ${GeistMono.variable} dark`}>
+    <html lang="en" className={`${plexSans.variable} ${plexMono.variable} dark`}>
       <body className="font-sans antialiased">
         <Providers>{children}</Providers>
       </body>

@@ -50,7 +50,7 @@ function describeFilter(filter: {
   if (filter.severity) parts.push(`severity = ${filter.severity}`);
   if (filter.status) parts.push(`status = ${filter.status}`);
   if (filter.sinceMinutes) parts.push(`last ${filter.sinceMinutes} min`);
-  return parts.length > 0 ? parts.join(' · ') : 'no filters recognized — showing recent incidents';
+  return parts.length > 0 ? parts.join(' · ') : 'No filters recognized, showing recent incidents';
 }
 
 // one incident as a feed row — shared by the live feed and search results
@@ -102,7 +102,7 @@ function IncidentRowLink({
         <div className="hidden shrink-0 text-right sm:block">
           <div className="font-mono text-[12.5px] text-text-primary">{incident.correlationKey}</div>
           <div className="font-mono text-[10.5px] text-text-muted">
-            {geo ? `${geo.countryName}${geo.source === 'simulated' ? ' · sim' : ''}` : '—'}
+            {geo ? `${geo.countryName}${geo.source === 'simulated' ? ' · sim' : ''}` : '-'}
           </div>
         </div>
         <div className="w-20 shrink-0 text-right">
@@ -117,7 +117,7 @@ function IncidentRowLink({
       </div>
       {summary && (
         <p className="ml-[90px] line-clamp-2 flex items-start gap-2 text-[12px] leading-relaxed text-text-muted">
-          <span className="text-gradient shrink-0 font-mono text-[10px] font-semibold uppercase">
+          <span className="shrink-0 font-mono text-[10px] font-semibold text-accent uppercase">
             {summary.generatedBy === 'llm' ? 'AI' : 'auto'}
           </span>
           <span>{summary.summary}</span>
@@ -161,7 +161,7 @@ export default function AlertsPage() {
     <main className="mx-auto max-w-[1400px] px-4 py-8 sm:px-6 lg:px-8">
       <PageHeader
         title="Alerts"
-        description="Every incident as it forms, newest first — correlated per source and summarized as it settles."
+        description="Incidents as they form, newest first."
         actions={
           metrics && (
             <span className="rounded-full border border-border-subtle bg-bg-panel px-3 py-1 font-mono text-[11px] text-text-secondary">
@@ -180,7 +180,7 @@ export default function AlertsPage() {
           <input
             value={question}
             onChange={(e) => setQuestion(e.target.value)}
-            placeholder="Ask in plain English — “show sqli incidents from the last hour”"
+            placeholder="Ask a question, like “sqli in the last hour”"
             className="h-9 min-w-0 flex-1 bg-transparent text-sm text-text-primary placeholder:text-text-muted focus:outline-none"
           />
           <Button type="submit" size="sm" disabled={!question.trim() || queryPending}>

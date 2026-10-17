@@ -24,7 +24,7 @@ const TOUR_STEPS: TourStep[] = [
     route: '/overview',
     selector: 'overview-metrics',
     title: 'A live pipeline, not a mockup',
-    body: 'Every number here is real — events, alerts, incidents, and AI summaries streaming through the actual running pipeline right now.',
+    body: 'These numbers come from the running pipeline.',
   },
   {
     route: '/overview',
@@ -36,13 +36,13 @@ const TOUR_STEPS: TourStep[] = [
     route: '/simulator',
     selector: 'scenario-cards',
     title: 'Fire a real attack',
-    body: 'Launch a scenario — a burst of failed SSH logins, a SQLi probe — straight into the live pipeline.',
+    body: 'Launch a scenario into the live pipeline.',
   },
   {
     route: '/simulator',
     selector: 'pipeline-flow',
     title: 'Watch it move, stage by stage',
-    body: 'Kafka → parser → detection → correlation → AI summarization — each stage lights up as your event passes through it.',
+    body: 'Each stage lights up as your event passes through it.',
   },
   {
     route: '/alerts',
@@ -242,7 +242,7 @@ function TourHighlight({
         initial={{ opacity: 0, scale: 0.97 }}
         animate={{ opacity: 1, scale: 1 }}
         transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
-        className="pointer-events-none fixed z-[60] rounded-lg border-2 border-accent shadow-[0_0_0_4px_color-mix(in_srgb,var(--color-accent)_18%,transparent)]"
+        className="pointer-events-none fixed z-[60] rounded-lg border-2 border-accent ring-4 ring-accent/15"
         style={{
           top: rect.top - 6,
           left: rect.left - 6,

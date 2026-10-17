@@ -4,14 +4,12 @@ import { cva, type VariantProps } from 'class-variance-authority';
 import { cn } from '@/lib/utils';
 
 const buttonVariants = cva(
-  'inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-lg text-sm font-medium transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 focus-visible:ring-offset-2 focus-visible:ring-offset-bg-base active:translate-y-px disabled:pointer-events-none disabled:opacity-45 [&_svg]:size-4 [&_svg]:shrink-0',
+  'inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-[5px] text-sm font-medium transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 focus-visible:ring-offset-2 focus-visible:ring-offset-bg-base active:translate-y-px disabled:pointer-events-none disabled:opacity-45 [&_svg]:size-4 [&_svg]:shrink-0',
   {
     variants: {
       variant: {
-        default:
-          'bg-brand text-bg-base shadow-[0_6px_24px_-8px_var(--color-accent)] hover:brightness-110',
-        destructive:
-          'bg-severity-critical/90 text-white hover:bg-severity-critical shadow-[0_6px_24px_-10px_var(--color-severity-critical)]',
+        default: 'bg-accent text-accent-ink hover:bg-accent-strong',
+        destructive: 'bg-severity-critical/90 text-white hover:bg-severity-critical',
         outline:
           'border border-border-strong bg-bg-panel/60 text-text-primary hover:border-text-muted hover:bg-bg-elevated',
         secondary:

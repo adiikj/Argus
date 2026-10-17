@@ -78,8 +78,7 @@ function ReadOnlyActions({ incident }: { incident: Incident }) {
       </CardHeader>
       <CardContent className="space-y-4">
         <p className="text-sm text-text-secondary">
-          You&apos;re signed in with a read-only account — triage actions (acknowledge, resolve,
-          assign) are disabled.
+          This is a read-only account, so triage actions are disabled.
         </p>
         {incident.resolutionNote && <ResolutionNote note={incident.resolutionNote} />}
       </CardContent>
@@ -269,7 +268,7 @@ export function IncidentDetailClient({ id }: { id: string }) {
     return (
       <div className="flex min-h-[calc(100vh-4rem)] flex-col items-center justify-center gap-3 px-6 text-center">
         <p className="text-sm text-text-secondary">
-          Couldn&apos;t find that incident — it may have rolled out of view, or the api isn&apos;t
+          Couldn&apos;t find that incident. It may have rolled out of view, or the api isn&apos;t
           reachable.
         </p>
         <Link href="/alerts" className="text-xs text-accent hover:underline">
@@ -341,10 +340,10 @@ export function IncidentDetailClient({ id }: { id: string }) {
       <div className="grid items-start gap-5 lg:grid-cols-3">
         <div className="space-y-5 lg:col-span-2">
           <motion.div {...fadeIn(0.06)}>
-            <Card className="border-gradient">
+            <Card>
               <CardHeader className="flex-row items-center justify-between">
                 <CardTitle className="flex items-center gap-2">
-                  <span className="text-gradient font-semibold">AI summary</span>
+                  <span className="text-accent">AI summary</span>
                 </CardTitle>
                 {summary && (
                   <span className="font-mono text-[10.5px] uppercase text-text-muted">
@@ -396,7 +395,7 @@ export function IncidentDetailClient({ id }: { id: string }) {
                   </div>
                 ) : (
                   <p className="text-sm text-text-muted">
-                    No summary yet — one generates shortly after the incident settles.
+                    No summary yet. One is written shortly after the incident settles.
                   </p>
                 )}
               </CardContent>

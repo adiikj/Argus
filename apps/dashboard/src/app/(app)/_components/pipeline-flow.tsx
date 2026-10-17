@@ -70,10 +70,10 @@ export function PipelineFlow() {
           <div key={node.key} className="flex flex-1 items-center">
             <Node label={node.label} Icon={node.icon} pulseCount={pulses[node.key] ?? 0} />
             {i < NODES.length - 1 && (
-              <div className="relative mx-1 mb-6 h-px flex-1 overflow-hidden bg-border-strong sm:mx-2">
-                <div
-                  className="animate-beam absolute inset-y-0 w-1/3 bg-[linear-gradient(90deg,transparent,var(--color-accent),transparent)]"
-                  style={{ animationDelay: `${i * 0.35}s` }}
+              <div className="relative mx-1 mb-6 h-px flex-1 bg-border-strong sm:mx-2">
+                <span
+                  className="animate-packet absolute -top-[2px] left-0 h-[5px] w-[5px] bg-accent"
+                  style={{ animationDelay: `${i * 0.35}s`, ['--travel' as string]: '80px' }}
                 />
               </div>
             )}

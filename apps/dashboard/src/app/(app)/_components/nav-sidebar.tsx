@@ -84,7 +84,7 @@ export function NavSidebar({ onNavigate }: { onNavigate?: () => void }) {
                     )}
                   >
                     {active && (
-                      <span className="bg-brand absolute top-1.5 bottom-1.5 left-0 w-[3px] rounded-full" />
+                      <span className="bg-accent absolute top-1.5 bottom-1.5 left-0 w-[3px] rounded-full" />
                     )}
                     <Icon
                       className={cn(

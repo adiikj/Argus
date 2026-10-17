@@ -60,7 +60,7 @@ export default function IncidentsPage() {
     <main className="mx-auto max-w-[1400px] px-4 py-8 sm:px-6 lg:px-8">
       <PageHeader
         title="Incidents"
-        description="Alerts correlated per source into incidents. Triage them here — acknowledge, resolve with a note, or mark a false positive."
+        description="Alerts grouped per source. Open one to triage it."
       />
 
       <div className="mb-4 flex flex-wrap gap-1 rounded-xl border border-border-subtle bg-bg-panel/60 p-1 sm:inline-flex">
@@ -130,7 +130,7 @@ export default function IncidentsPage() {
                       <div className="font-mono text-[10.5px] text-text-muted">
                         {geo
                           ? `${geo.countryName}${geo.source === 'simulated' ? ' · simulated' : ''}`
-                          : '—'}
+                          : '-'}
                       </div>
                     </td>
                     <td className="px-3 py-3">

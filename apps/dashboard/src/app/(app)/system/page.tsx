@@ -29,10 +29,7 @@ export default function SystemHealthPage() {
 
   return (
     <main className="mx-auto max-w-[1400px] px-4 py-8 sm:px-6 lg:px-8">
-      <PageHeader
-        title="System Health"
-        description="The infrastructure under the pipeline — Kafka consumer lag per group, the event store, and Postgres latency."
-      />
+      <PageHeader title="System Health" description="Kafka, the event store and Postgres." />
 
       {isLoading && <p className="text-sm text-text-secondary">Checking system health…</p>}
       {isError && (
@@ -117,10 +114,7 @@ export default function SystemHealthPage() {
                       store.
                     </>
                   ) : (
-                    <>
-                      STORAGE_PROFILE=lite — events are searched via Postgres full-text search
-                      instead of Elasticsearch.
-                    </>
+                    <>Lite profile: events are searched with Postgres full-text search.</>
                   )}
                 </p>
               </CardContent>
