@@ -12,12 +12,17 @@ export const RULE_ID = 'login-after-brute-force';
 // successful login from the same source checks whether that success came
 // right after a run of failures for the same account, or after the source
 // sprayed many accounts. Either way the attacker now holds valid credentials
-// (T1078) — the one alert in the set that is critical on its own.
+// (T1078) — the one alert in the set that is critical on its own. Covers the
+// console's own sign-ins too, so a guessed analyst password is caught the
+// moment it is used.
 export const loginAfterBruteForceRule: StatefulRule = {
   kind: 'stateful',
   id: RULE_ID,
   evaluate: async (event, ctx) => {
-    if (event.source !== 'auth') return undefined;
+    // SSH logins, and sign-ins to the Argus console itself (selfmon)
+    const signIn =
+      event.source === 'auth' || (event.source === 'argus' && !!event.path?.startsWith('/auth/'));
+    if (!signIn) return undefined;
     const account = `${event.sourceIp}|${event.username ?? ''}`;
 
     if (event.outcome === 'failure') {

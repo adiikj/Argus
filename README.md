@@ -77,7 +77,10 @@ through each stage. All message shapes live in one Zod contract package shared b
 
 ## Detection coverage
 
-12 rules, 11 techniques, 6 tactics. The mapping lives in
+15 rules, 12 techniques, 6 tactics. Eleven are Sigma-style YAML in
+[`apps/api/rules`](apps/api/rules), each carrying its own match and no-match fixtures, and three of
+those watch Argus's own console: its sign-ins, sessions and ingest tokens go through the same
+pipeline as everything else. The mapping lives in
 [`packages/contracts/src/rules.ts`](packages/contracts/src/rules.ts) and drives the console's
 ATT&CK badges, the kill-chain view, the coverage page and the summaries.
 
@@ -89,9 +92,12 @@ ATT&CK badges, the kill-chain view, the coverage page and the summaries.
 | `brute-force-ssh` | SSH brute force | high | [T1110.001](https://attack.mitre.org/techniques/T1110/001/) Password Guessing | Credential Access |
 | `password-spraying` | Password spraying | high | [T1110.003](https://attack.mitre.org/techniques/T1110/003/) Password Spraying | Credential Access |
 | `login-after-brute-force` | Login after brute force | critical | [T1078](https://attack.mitre.org/techniques/T1078/) Valid Accounts | Initial Access |
+| `console-login-brute-force` | Console login brute force | high | [T1110](https://attack.mitre.org/techniques/T1110/) Brute Force | Credential Access |
+| `ingest-token-guessing` | Ingest token guessing | medium | [T1110](https://attack.mitre.org/techniques/T1110/) Brute Force | Credential Access |
 | `sqli-attempt` | SQL injection attempt | high | [T1190](https://attack.mitre.org/techniques/T1190/) Exploit Public-Facing Application | Initial Access |
 | `path-traversal` | Path traversal attempt | high | [T1190](https://attack.mitre.org/techniques/T1190/) Exploit Public-Facing Application | Initial Access |
 | `invalid-jwt` | Invalid token use | low | [T1550.001](https://attack.mitre.org/techniques/T1550/001/) Application Access Token | Defense Evasion |
+| `console-session-forgery` | Forged console session | medium | [T1550.001](https://attack.mitre.org/techniques/T1550/001/) Application Access Token | Defense Evasion |
 | `xss-attempt` | Cross-site scripting attempt | medium | [T1059.007](https://attack.mitre.org/techniques/T1059/007/) JavaScript | Execution |
 | `command-injection` | OS command injection attempt | high | [T1059.004](https://attack.mitre.org/techniques/T1059/004/) Unix Shell | Execution |
 | `api-rate-abuse` | API rate abuse | medium | [T1499.003](https://attack.mitre.org/techniques/T1499/003/) Application Exhaustion Flood | Impact |

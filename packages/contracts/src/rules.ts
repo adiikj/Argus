@@ -125,7 +125,7 @@ export const RULE_CATALOG = {
     format: 'code',
     name: 'Login after brute force',
     detects:
-      'A successful login from a source that just failed ≥ 5 times on that account, or sprayed ≥ 5 accounts, within 10 min.',
+      'A successful SSH or Argus console login from a source that just failed ≥ 5 times on that account, or sprayed ≥ 5 accounts, within 10 min.',
     severity: 'critical',
     stage: 'access',
     tactic: TACTIC.initialAccess,
@@ -136,6 +136,55 @@ export const RULE_CATALOG = {
       'Block the source IP',
     ],
     scenario: 'account-takeover',
+  },
+  'console-login-brute-force': {
+    id: 'console-login-brute-force',
+    name: 'Console login brute force',
+    detects:
+      '≥ 5 failed sign-ins to the Argus console from one IP within 5 min (Argus monitoring its own logins).',
+    severity: 'high',
+    stage: 'access',
+    tactic: TACTIC.credentialAccess,
+    technique: { id: 'T1110', name: 'Brute Force' },
+    response: [
+      'Block the source at the edge; check which console accounts it tried',
+      'Make sure no targeted account signed in afterwards (login-after-brute-force)',
+      'Rotate the password of any account it was guessing',
+    ],
+    format: 'sigma',
+  },
+  'console-session-forgery': {
+    id: 'console-session-forgery',
+    name: 'Forged console session',
+    detects:
+      '≥ 10 requests from one IP within 1 min carrying a console session token that fails verification.',
+    severity: 'medium',
+    stage: 'access',
+    tactic: TACTIC.defenseEvasion,
+    technique: {
+      id: 'T1550.001',
+      name: 'Use Alternate Authentication Material: Application Access Token',
+    },
+    response: [
+      'Check whether the tokens are forged, replayed or merely expired',
+      'Rotate AUTH_SECRET if forgery is suspected (signs everyone out)',
+    ],
+    format: 'sigma',
+  },
+  'ingest-token-guessing': {
+    id: 'ingest-token-guessing',
+    name: 'Ingest token guessing',
+    detects:
+      '≥ 3 POST /ingest requests with a missing or wrong shipper token from one IP within 10 min.',
+    severity: 'medium',
+    stage: 'access',
+    tactic: TACTIC.credentialAccess,
+    technique: { id: 'T1110', name: 'Brute Force' },
+    response: [
+      'Block the source; no legitimate shipper retries a rejected token',
+      'Rotate INGEST_TOKENS if one may have leaked',
+    ],
+    format: 'sigma',
   },
   'sqli-attempt': {
     id: 'sqli-attempt',

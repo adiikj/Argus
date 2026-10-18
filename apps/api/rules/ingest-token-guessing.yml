@@ -1,0 +1,37 @@
+title: Ingest token guessing
+id: ingest-token-guessing
+status: stable
+description: >
+  Repeated POST /ingest requests with a missing or wrong shipper token from one
+  source. A configured shipper never fails twice, so this is someone trying to
+  write into the pipeline.
+references:
+  - https://attack.mitre.org/techniques/T1110/
+tags:
+  - attack.credential-access
+  - attack.t1110
+logsource:
+  product: argus
+  service: argus
+detection:
+  rejected_ingest:
+    path: /ingest
+    statusCode: 401
+  condition: rejected_ingest | count() by sourceIp >= 3
+timeframe: 10m
+falsepositives:
+  - A shipper left running after its token was rotated out
+level: medium
+argus:
+  message: '{count} rejected ingest tokens from {sourceIp} in 10 min'
+tests:
+  match:
+    - events: [{ path: /ingest, method: POST, statusCode: 401 }]
+      repeat: 3
+  nomatch:
+    - events: [{ path: /ingest, method: POST, statusCode: 401 }]
+      repeat: 2
+    - events: [{ path: /ingest, method: POST, statusCode: 202, outcome: success }]
+      repeat: 20
+    - events: [{ path: /incidents, statusCode: 401 }]
+      repeat: 5

@@ -1,0 +1,48 @@
+title: Forged console session
+id: console-session-forgery
+status: stable
+description: >
+  Requests to the console api carrying session tokens that fail verification:
+  a bad signature, a deleted account or an expired token, ten or more in a
+  minute from one source. One expired tab makes a handful of these; a forger
+  or replayer makes many. Requests with no token at all are not counted.
+references:
+  - https://attack.mitre.org/techniques/T1550/001/
+tags:
+  - attack.defense-evasion
+  - attack.t1550.001
+logsource:
+  product: argus
+  service: argus
+detection:
+  rejected_session:
+    statusCode: 401
+  sign_in_or_ingest:
+    - path|startswith: /auth/
+    - path: /ingest
+  condition: rejected_session and not sign_in_or_ingest | count() by sourceIp >= 10
+timeframe: 1m
+falsepositives:
+  - Many open dashboard tabs after AUTH_SECRET was rotated
+level: medium
+argus:
+  message: '{count} requests with an invalid console session from {sourceIp} in 1 min, latest on {path}'
+tests:
+  match:
+    - events: [{ path: /incidents, statusCode: 401, method: GET }]
+      repeat: 10
+    - events:
+        - { path: /metrics, statusCode: 401 }
+        - { path: /admin/users, statusCode: 401 }
+      repeat: 5
+  nomatch:
+    # one expired tab: a burst of polls, then the dashboard sends it to /login
+    - events:
+        - { path: /metrics, statusCode: 401 }
+        - { path: /incidents, statusCode: 401 }
+        - { path: /system/health, statusCode: 401 }
+        - { path: /ws, statusCode: 401 }
+    - events: [{ path: /auth/login, statusCode: 401 }]
+      repeat: 12
+    - events: [{ path: /admin/users, statusCode: 403 }]
+      repeat: 12

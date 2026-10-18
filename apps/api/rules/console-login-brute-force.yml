@@ -1,0 +1,45 @@
+title: Console login brute force
+id: console-login-brute-force
+status: stable
+description: >
+  Argus watching its own front door: repeated failed sign-ins to the console
+  from one source, by password or Google. Counts every account tried, so it
+  covers guessing one analyst's password and spraying many. The api emits these
+  events itself (source argus).
+references:
+  - https://attack.mitre.org/techniques/T1110/
+tags:
+  - attack.credential-access
+  - attack.t1110
+logsource:
+  product: argus
+  service: argus
+detection:
+  failed_sign_in:
+    path|startswith: /auth/
+    outcome: failure
+  condition: failed_sign_in | count() by sourceIp >= 5
+timeframe: 5m
+falsepositives:
+  - An analyst who forgot their password and keeps trying
+level: high
+argus:
+  message: '{count} failed console sign-ins from {sourceIp} in 5 min, last as {username|an unknown account}'
+tests:
+  match:
+    - events: [{ path: /auth/login, statusCode: 401, username: a*5@argus.buzz }]
+      repeat: 5
+    - events:
+        - { path: /auth/login, statusCode: 401, username: a*5@argus.buzz }
+        - { path: /auth/login, statusCode: 401, username: r*4@argus.buzz }
+        - { path: /auth/google, statusCode: 401 }
+        - { path: /auth/login, statusCode: 401, username: d*4@argus.buzz }
+        - { path: /auth/login, statusCode: 401, username: s*5@argus.buzz }
+  nomatch:
+    - events: [{ path: /auth/login, statusCode: 401 }]
+      repeat: 4
+    - events: [{ path: /auth/login, statusCode: 200, outcome: success }]
+      repeat: 10
+    # rejected session tokens are a different rule
+    - events: [{ path: /incidents, statusCode: 401 }]
+      repeat: 10

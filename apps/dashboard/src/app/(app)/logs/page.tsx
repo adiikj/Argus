@@ -10,7 +10,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { PageHeader } from '../_components/page-header';
 
-const SOURCES = ['auth', 'nginx', 'api-gateway'] as const;
+// argus = the console's own sign-ins, sessions and ingest tokens (self-monitoring)
+const SOURCES = ['auth', 'nginx', 'api-gateway', 'argus'] as const;
 
 function formatTime(iso: string): string {
   return new Date(iso).toLocaleString(undefined, { hour12: false });
