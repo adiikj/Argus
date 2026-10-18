@@ -21,6 +21,9 @@ const STAGE_LABEL: Record<AttackStage, string> = {
 
 const RULES: RuleInfo[] = Object.values(RULE_CATALOG);
 
+// the Sigma-format rule files the api compiles at boot
+const RULES_URL = 'https://github.com/adiikj/Argus/blob/main/apps/api/rules';
+
 function RuleCard({ rule }: { rule: RuleInfo }) {
   return (
     <Card>
@@ -46,14 +49,23 @@ function RuleCard({ rule }: { rule: RuleInfo }) {
             <li key={step}>{step}</li>
           ))}
         </ul>
-        {rule.scenario && (
-          <Link
-            href="/simulator"
-            className="inline-block font-mono text-xs text-accent hover:underline"
-          >
-            Try it: simulator → {rule.scenario}
-          </Link>
-        )}
+        <div className="flex flex-wrap gap-x-4 gap-y-1 font-mono text-xs">
+          {rule.scenario && (
+            <Link href="/simulator" className="text-accent hover:underline">
+              Try it: simulator → {rule.scenario}
+            </Link>
+          )}
+          {rule.format === 'sigma' && (
+            <a
+              href={`${RULES_URL}/${rule.id}.yml`}
+              target="_blank"
+              rel="noreferrer"
+              className="text-text-secondary hover:text-accent"
+            >
+              {rule.id}.yml ↗
+            </a>
+          )}
+        </div>
       </CardContent>
     </Card>
   );

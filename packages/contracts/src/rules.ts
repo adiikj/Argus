@@ -27,6 +27,9 @@ export interface RuleInfo {
   response: string[];
   // the attack simulator scenario that exercises this rule, if any
   scenario?: string;
+  // 'sigma': a YAML rule in apps/api/rules/<id>.yml; 'code': TypeScript, for
+  // logic a Sigma condition can't express
+  format: 'sigma' | 'code';
 }
 
 const TACTIC = {
@@ -41,6 +44,7 @@ const TACTIC = {
 export const RULE_CATALOG = {
   'dir-enumeration': {
     id: 'dir-enumeration',
+    format: 'sigma',
     name: 'Sensitive path enumeration',
     detects:
       'A request for a path only scanners ask for (/.env, /.git, /wp-login.php, /phpmyadmin, …).',
@@ -56,6 +60,7 @@ export const RULE_CATALOG = {
   },
   'scanner-user-agent': {
     id: 'scanner-user-agent',
+    format: 'code',
     name: 'Attack tool fingerprint',
     detects:
       'A User-Agent naming offensive tooling (sqlmap, nikto, nuclei, gobuster, ffuf). Once per tool per source per 10 min.',
@@ -71,6 +76,7 @@ export const RULE_CATALOG = {
   },
   'traffic-anomaly': {
     id: 'traffic-anomaly',
+    format: 'code',
     name: 'Traffic anomaly',
     detects:
       "A source's request rate 3σ above its own rolling 60 s baseline (10 s buckets, ≥ 8 requests).",
@@ -85,6 +91,7 @@ export const RULE_CATALOG = {
   },
   'brute-force-ssh': {
     id: 'brute-force-ssh',
+    format: 'sigma',
     name: 'SSH brute force',
     detects: '≥ 5 failed SSH logins for the same account from one IP within 60 s.',
     severity: 'high',
@@ -99,6 +106,7 @@ export const RULE_CATALOG = {
   },
   'password-spraying': {
     id: 'password-spraying',
+    format: 'code',
     name: 'Password spraying',
     detects: 'Failed logins for ≥ 5 different accounts from one IP within 5 min.',
     severity: 'high',
@@ -114,6 +122,7 @@ export const RULE_CATALOG = {
   },
   'login-after-brute-force': {
     id: 'login-after-brute-force',
+    format: 'code',
     name: 'Login after brute force',
     detects:
       'A successful login from a source that just failed ≥ 5 times on that account, or sprayed ≥ 5 accounts, within 10 min.',
@@ -130,6 +139,7 @@ export const RULE_CATALOG = {
   },
   'sqli-attempt': {
     id: 'sqli-attempt',
+    format: 'sigma',
     name: 'SQL injection attempt',
     detects:
       "A request path carrying SQL injection syntax (' OR, UNION SELECT, ; DROP TABLE, comment terminators), checked after URL-decoding.",
@@ -146,6 +156,7 @@ export const RULE_CATALOG = {
   },
   'path-traversal': {
     id: 'path-traversal',
+    format: 'sigma',
     name: 'Path traversal attempt',
     detects:
       'A ../ (or ..\\) step in the request path or query after repeated URL-decoding, or an overlong-UTF-8 encoded dot/slash.',
@@ -161,6 +172,7 @@ export const RULE_CATALOG = {
   },
   'xss-attempt': {
     id: 'xss-attempt',
+    format: 'sigma',
     name: 'Cross-site scripting attempt',
     detects:
       '<script>, javascript: URLs, inline event handlers (onerror=, onload=, …) or alert()/document.cookie in the decoded request.',
@@ -176,6 +188,7 @@ export const RULE_CATALOG = {
   },
   'command-injection': {
     id: 'command-injection',
+    format: 'sigma',
     name: 'OS command injection attempt',
     detects:
       'A shell metacharacter (; | && ` $() followed by a command (id, whoami, cat, curl, wget, …), or ${IFS}, in the decoded request.',
@@ -191,6 +204,7 @@ export const RULE_CATALOG = {
   },
   'invalid-jwt': {
     id: 'invalid-jwt',
+    format: 'sigma',
     name: 'Invalid token use',
     detects: 'An API request rejected with 401 for an invalid or expired JWT.',
     severity: 'low',
@@ -208,6 +222,7 @@ export const RULE_CATALOG = {
   },
   'api-rate-abuse': {
     id: 'api-rate-abuse',
+    format: 'sigma',
     name: 'API rate abuse',
     detects: '> 30 API requests from one IP within 10 s.',
     severity: 'medium',
