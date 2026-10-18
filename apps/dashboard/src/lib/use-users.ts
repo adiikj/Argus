@@ -12,6 +12,7 @@ async function fetchUsers(): Promise<PublicUser[]> {
   return body.users;
 }
 
-export function useUsers() {
-  return useQuery({ queryKey: ['users'], queryFn: fetchUsers, staleTime: 60_000 });
+// enabled=false for viewers: the api hides the account list from them
+export function useUsers(enabled = true) {
+  return useQuery({ queryKey: ['users'], queryFn: fetchUsers, staleTime: 60_000, enabled });
 }

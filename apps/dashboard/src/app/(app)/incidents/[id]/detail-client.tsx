@@ -17,6 +17,7 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { KillChain } from '../../_components/kill-chain';
 import { AttackTechnique } from '../../_components/attack-technique';
+import { AuditTrail } from '../../_components/audit-trail';
 
 function formatDateTime(iso: string): string {
   return new Date(iso).toLocaleString(undefined, { hour12: false });
@@ -259,6 +260,7 @@ export function IncidentDetailClient({ id }: { id: string }) {
   const { data, isLoading, isError } = useIncidentDetail(id);
   const role = useSessionRole();
   const { incidents: liveRows } = useRealtime();
+  const { data: users } = useUsers(role !== null && role !== 'viewer');
 
   if (isLoading) {
     return <div className="px-6 py-8 text-sm text-text-secondary">Loading incident…</div>;
@@ -278,7 +280,11 @@ export function IncidentDetailClient({ id }: { id: string }) {
     );
   }
 
-  const { incident, alerts, summary, reputation } = data;
+  const { incident, alerts, summary, reputation, activity = [] } = data;
+  const nameOf = (userId: string) => {
+    const user = users?.find((u) => u.userId === userId);
+    return user ? (user.name ?? user.email) : 'someone';
+  };
   const geo = liveRows.find((r) => r.incident.incidentId === incident.incidentId)?.geo;
 
   return (
@@ -464,6 +470,16 @@ export function IncidentDetailClient({ id }: { id: string }) {
               <ThreatIntelCard reputation={reputation} />
             </motion.div>
           )}
+          <motion.div {...fadeIn(0.2)}>
+            <Card>
+              <CardHeader>
+                <CardTitle>Activity</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <AuditTrail entries={activity} nameOf={nameOf} empty="Nobody has triaged it yet." />
+              </CardContent>
+            </Card>
+          </motion.div>
         </div>
       </div>
     </main>

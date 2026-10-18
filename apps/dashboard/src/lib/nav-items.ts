@@ -7,6 +7,7 @@ import {
   ShieldCheck,
   HeartPulse,
   Timer,
+  KeyRound,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -15,6 +16,8 @@ export interface NavItem {
   label: string;
   icon: LucideIcon;
   description: string;
+  // shown to admins only; the api enforces it either way
+  adminOnly?: boolean;
 }
 
 export interface NavSection {
@@ -84,12 +87,23 @@ export const NAV_SECTIONS: NavSection[] = [
         icon: HeartPulse,
         description: 'Kafka lag, storage and database status',
       },
+      {
+        href: '/admin',
+        label: 'Access',
+        icon: KeyRound,
+        description: 'Accounts, roles and the audit trail',
+        adminOnly: true,
+      },
     ],
   },
 ];
 
 // flat list — the command palette and the top bar's page lookup
 export const NAV_ITEMS: NavItem[] = NAV_SECTIONS.flatMap((section) => section.items);
+
+export function visibleTo(role: string | null): (item: NavItem) => boolean {
+  return (item) => !item.adminOnly || role === 'admin';
+}
 
 export function navItemFor(pathname: string): NavItem | undefined {
   return NAV_ITEMS.find((item) => pathname === item.href || pathname.startsWith(`${item.href}/`));

@@ -7,7 +7,8 @@ import { Wordmark } from '../../_components/wordmark';
 import { useRealtime } from '@/lib/realtime';
 import { useTour } from '@/lib/tour';
 import { clearToken } from '@/lib/auth';
-import { NAV_SECTIONS } from '@/lib/nav-items';
+import { NAV_SECTIONS, visibleTo } from '@/lib/nav-items';
+import { useSessionRole } from '@/lib/use-session-role';
 import { useCommandPalette } from './command-palette';
 import { cn } from '@/lib/utils';
 
@@ -17,6 +18,7 @@ const ITEM =
 // the sidebar body — rendered fixed on desktop and inside the drawer on mobile
 export function NavSidebar({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
+  const role = useSessionRole();
   const router = useRouter();
   const { connected } = useRealtime();
   const { setOpen } = useCommandPalette();
@@ -69,7 +71,7 @@ export function NavSidebar({ onNavigate }: { onNavigate?: () => void }) {
               {section.label}
             </p>
             <div className="space-y-0.5">
-              {section.items.map(({ href, label, icon: Icon }) => {
+              {section.items.filter(visibleTo(role)).map(({ href, label, icon: Icon }) => {
                 const active = pathname === href || pathname.startsWith(`${href}/`);
                 return (
                   <Link

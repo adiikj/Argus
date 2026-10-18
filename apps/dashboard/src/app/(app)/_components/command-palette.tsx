@@ -3,7 +3,8 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import { useRealtime } from '@/lib/realtime';
-import { NAV_ITEMS } from '@/lib/nav-items';
+import { NAV_ITEMS, visibleTo } from '@/lib/nav-items';
+import { useSessionRole } from '@/lib/use-session-role';
 import {
   CommandDialog,
   CommandEmpty,
@@ -51,6 +52,7 @@ export function CommandPaletteProvider({ children }: { children: ReactNode }) {
 function CommandPalette({ open, setOpen }: { open: boolean; setOpen: (open: boolean) => void }) {
   const router = useRouter();
   const { incidents } = useRealtime();
+  const role = useSessionRole();
 
   const go = (href: string): void => {
     setOpen(false);
@@ -63,7 +65,7 @@ function CommandPalette({ open, setOpen }: { open: boolean; setOpen: (open: bool
       <CommandList>
         <CommandEmpty>No results.</CommandEmpty>
         <CommandGroup heading="Navigate">
-          {NAV_ITEMS.map(({ href, label, icon: Icon }) => (
+          {NAV_ITEMS.filter(visibleTo(role)).map(({ href, label, icon: Icon }) => (
             <CommandItem key={href} value={label} onSelect={() => go(href)}>
               <Icon className="h-4 w-4 text-text-secondary" strokeWidth={1.8} />
               {label}
