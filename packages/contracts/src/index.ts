@@ -54,6 +54,9 @@ export const Alert = z.object({
   eventIds: z.array(z.string().uuid()).min(1),
   message: z.string(),
   count: z.number().int().positive().optional(), // for windowed rules
+  // earliest evidence the alert cites: the triggering event's timestamp, or
+  // when a windowed rule's window started filling. MTTD reads it.
+  firstSeenAt: z.string().datetime().optional(),
 });
 export type Alert = z.infer<typeof Alert>;
 
@@ -72,6 +75,9 @@ export const Incident = z.object({
   eventIds: z.array(z.string().uuid()).min(1),
   assigneeId: z.string().uuid().nullable(),
   resolutionNote: z.string().nullable(),
+  // first move out of open, and the latest close (null again after a reopen)
+  acknowledgedAt: z.string().datetime().nullable().optional(),
+  closedAt: z.string().datetime().nullable().optional(),
 });
 export type Incident = z.infer<typeof Incident>;
 
@@ -176,3 +182,46 @@ export const IncidentSummary = z.object({
   generatedAt: z.string().datetime(),
 });
 export type IncidentSummary = z.infer<typeof IncidentSummary>;
+
+// GET /soc-metrics?days=N — how fast incidents are detected and handled, and
+// which rules cry wolf. Durations are in seconds, null when nothing in the
+// window qualifies yet.
+export const DurationStat = z.object({
+  mean: z.number().nonnegative().nullable(),
+  median: z.number().nonnegative().nullable(),
+  samples: z.number().int().nonnegative(),
+});
+export type DurationStat = z.infer<typeof DurationStat>;
+
+export const RuleMetrics = z.object({
+  ruleId: z.string(),
+  alerts: z.number().int().nonnegative(),
+  incidents: z.number().int().nonnegative(),
+  closed: z.number().int().nonnegative(),
+  falsePositives: z.number().int().nonnegative(),
+  falsePositiveRate: z.number().min(0).max(1).nullable(), // of closed incidents
+  mttdSeconds: z.number().nonnegative().nullable(),
+});
+export type RuleMetrics = z.infer<typeof RuleMetrics>;
+
+export const SocMetrics = z.object({
+  days: z.number().int().positive(),
+  since: z.string().datetime(),
+  incidents: z.number().int().nonnegative(),
+  backlog: z.number().int().nonnegative(), // open + acknowledged
+  closed: z.number().int().nonnegative(),
+  falsePositives: z.number().int().nonnegative(),
+  falsePositiveRate: z.number().min(0).max(1).nullable(),
+  mttd: DurationStat, // first evidence -> incident opened
+  mtta: DurationStat, // incident opened -> first triage
+  mttr: DurationStat, // incident opened -> closed
+  rules: z.array(RuleMetrics),
+  daily: z.array(
+    z.object({
+      date: z.string(), // YYYY-MM-DD, UTC
+      opened: z.number().int().nonnegative(),
+      closed: z.number().int().nonnegative(),
+    }),
+  ),
+});
+export type SocMetrics = z.infer<typeof SocMetrics>;

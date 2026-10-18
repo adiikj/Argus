@@ -1,4 +1,4 @@
-import type { StatefulRule } from '../rule.js';
+import { windowStart, type StatefulRule } from '../rule.js';
 
 const DISTINCT_USERS = 5; // different accounts failed from one IP…
 const WINDOW_MS = 5 * 60_000; // …within this trailing window
@@ -32,6 +32,7 @@ export const passwordSprayingRule: StatefulRule = {
       eventIds: events.map((entry) => entry.eventId),
       message: `Password spraying from ${event.sourceIp}: failed logins for ${users.length} different accounts (${users.map((u) => u.eventId).join(', ')}) in ${WINDOW_MS / 60_000} min`,
       count: users.length,
+      firstSeenAt: windowStart(events),
     };
   },
 };

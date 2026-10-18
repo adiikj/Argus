@@ -1,4 +1,4 @@
-import type { StatefulRule } from '../rule.js';
+import { windowStart, type StatefulRule } from '../rule.js';
 
 const FAILED_ATTEMPTS = 5; // same bar as brute-force-ssh
 const SPRAYED_ACCOUNTS = 5; // same bar as password-spraying
@@ -46,6 +46,7 @@ export const loginAfterBruteForceRule: StatefulRule = {
       ],
       message: `Likely account compromise: ${event.username ?? 'unknown user'} logged in from ${event.sourceIp} ${how}`,
       count: guessed ? failures.length : sprayed.length,
+      firstSeenAt: windowStart(guessed ? failures : sprayed),
     };
   },
 };

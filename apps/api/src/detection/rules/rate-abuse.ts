@@ -1,4 +1,4 @@
-import type { StatefulRule } from '../rule.js';
+import { windowStart, type StatefulRule } from '../rule.js';
 
 // tune once you've watched it against the rate-abuse scenario's traffic.
 const THRESHOLD = 30; // requests
@@ -25,6 +25,7 @@ export const rateAbuseRule: StatefulRule = {
         eventIds: recent.map((entry) => entry.eventId),
         message: `${recent.length} API requests from ${event.sourceIp} in ${WINDOW_MS / 1000}s (rate abuse)`,
         count: recent.length,
+        firstSeenAt: windowStart(recent),
       };
     }
     return undefined;

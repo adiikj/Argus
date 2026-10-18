@@ -1,8 +1,10 @@
 import type { NormalizedEvent, Alert } from '@argus/contracts';
-import type { WindowStore } from './window-store.js';
+import type { WindowEntry, WindowStore } from './window-store.js';
 import type { BaselineStore } from './baseline-store.js';
 
 // engine fills in alertId + timestamp; the rule only decides *whether* and *why*.
+// firstSeenAt defaults to the triggering event's timestamp — windowed rules
+// set it to when their window started filling.
 export type PendingAlert = Omit<Alert, 'alertId' | 'timestamp'>;
 
 export interface RuleContext {
@@ -27,3 +29,10 @@ export interface StatefulRule {
 }
 
 export type Rule = StatelessRule | StatefulRule;
+
+// firstSeenAt for a windowed alert: when the oldest entry still in the window
+// was recorded
+export function windowStart(entries: WindowEntry[]): string | undefined {
+  const oldest = entries[0];
+  return oldest ? new Date(oldest.at).toISOString() : undefined;
+}

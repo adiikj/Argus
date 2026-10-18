@@ -17,6 +17,8 @@ export function incidentRowToContract(row: IncidentRow): Incident {
     eventIds: row.eventIds,
     assigneeId: row.assigneeId,
     resolutionNote: row.resolutionNote,
+    acknowledgedAt: row.acknowledgedAt?.toISOString() ?? null,
+    closedAt: row.closedAt?.toISOString() ?? null,
   };
 }
 
@@ -30,6 +32,7 @@ export function alertRowToContract(row: AlertRow): Alert {
     eventIds: row.eventIds,
     message: row.message,
     count: row.count ?? undefined,
+    firstSeenAt: row.firstSeenAt?.toISOString(),
   };
 }
 

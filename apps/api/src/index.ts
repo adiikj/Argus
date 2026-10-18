@@ -39,6 +39,7 @@ import {
   patchIncident,
   searchIncidents,
   getRecentActivity,
+  getSocMetrics,
   getAlertsAndIncidentsForEvent,
   CORRELATION_WINDOW_MS,
   type PrismaClient,
@@ -167,6 +168,7 @@ async function startRealtime(
     },
     patchIncident: (id, input) => patchIncident(prisma, id, input),
     getRecentActivity: () => getRecentActivity(prisma),
+    getSocMetrics: (days) => getSocMetrics(prisma, days),
     queryIncidents: async (question) => {
       const filter = await translateQuery(selectProvider(config), question, log);
       return { filter, incidents: await searchIncidents(prisma, filter) };

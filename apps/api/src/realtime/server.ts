@@ -10,10 +10,11 @@ import {
   type NormalizedEvent,
   type PublicUser,
   type RecentActivity,
+  type SocMetrics,
 } from '@argus/contracts';
 import type { AppConfig } from '@argus/config';
 import type { Bus, IncidentEvent } from '../bus/index.js';
-import type { IncidentDetail, PatchIncidentResult } from '../incident/index.js';
+import { clampDays, type IncidentDetail, type PatchIncidentResult } from '../incident/index.js';
 import type { EventSearchParams } from '../storage/index.js';
 import type { SystemHealth } from '../system/index.js';
 import { canAccess, type AuthService } from '../auth/index.js';
@@ -53,6 +54,7 @@ export interface RealtimeOptions {
   patchIncident?: (id: string, input: IncidentPatch) => Promise<PatchIncidentResult>;
   queryIncidents?: (question: string) => Promise<IncidentQueryResult>;
   getRecentActivity?: () => Promise<RecentActivity>;
+  getSocMetrics?: (days: number) => Promise<SocMetrics>;
   listUsers?: () => Promise<PublicUser[]>;
   searchEvents?: (params: EventSearchParams) => Promise<NormalizedEvent[]>;
   getEventTrace?: (eventId: string) => Promise<EventTrace>;
@@ -252,6 +254,16 @@ export async function createRealtimeServer(bus: Bus, port: number, opts: Realtim
       return { error: 'question required' };
     }
     return (await opts.queryIncidents?.(question)) ?? { filter: {}, incidents: [] };
+  });
+
+  app.get('/soc-metrics', async (req, reply) => {
+    const { days } = req.query as { days?: string };
+    const metrics = await opts.getSocMetrics?.(clampDays(days));
+    if (!metrics) {
+      reply.code(503);
+      return { error: 'metrics unavailable' };
+    }
+    return metrics;
   });
 
   app.get('/users', async () => ({ users: (await opts.listUsers?.()) ?? [] }));

@@ -97,3 +97,35 @@ describe('alert throttling', () => {
     for (let i = 0; i < 3; i += 1) expect(await engine.evaluate(sqli())).toHaveLength(1);
   });
 });
+
+describe('first evidence (MTTD)', () => {
+  it('stamps a single-event alert with the event time', async () => {
+    const engine = createRuleEngine(
+      [sqliRule],
+      new InMemoryWindowStore(),
+      new InMemoryBaselineStore(),
+    );
+    const [alert] = await engine.evaluate(
+      event({ path: "/q?id=1' OR '1'='1", timestamp: '2026-10-17T11:59:58.000Z' }),
+    );
+    expect(alert?.firstSeenAt).toBe('2026-10-17T11:59:58.000Z');
+  });
+
+  it('stamps a windowed alert with when its window started filling', async () => {
+    const engine = createRuleEngine(
+      [bruteForceRule],
+      new InMemoryWindowStore(),
+      new InMemoryBaselineStore(),
+    );
+    const start = Date.now();
+    let alerts: Awaited<ReturnType<typeof engine.evaluate>> = [];
+    for (let i = 0; i < 5; i += 1) {
+      alerts = await engine.evaluate(
+        event({ source: 'auth', outcome: 'failure', username: 'root' }),
+      );
+    }
+    const firstSeen = Date.parse(alerts[0]!.firstSeenAt!);
+    expect(firstSeen).toBeGreaterThanOrEqual(start);
+    expect(firstSeen).toBeLessThanOrEqual(Date.parse(alerts[0]!.timestamp));
+  });
+});

@@ -80,6 +80,7 @@ export function createRuleEngine(
         alerts.push({
           ...pending,
           message,
+          firstSeenAt: pending.firstSeenAt ?? event.timestamp,
           alertId: randomUUID(),
           timestamp: new Date().toISOString(),
         });

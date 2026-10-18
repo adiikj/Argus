@@ -51,6 +51,11 @@ model Incident {
   eventIds       String[]       @map("event_ids")
   assigneeId     String?        @map("assignee_id")
   resolutionNote String?        @map("resolution_note")
+  // triage timestamps behind the SOC metrics (MTTA / MTTR): the first time
+  // anyone moved the incident out of open, and when it was last closed
+  // (resolved or false positive; cleared again on reopen)
+  acknowledgedAt DateTime?      @map("acknowledged_at")
+  closedAt       DateTime?      @map("closed_at")
 
   assignee User?    @relation(fields: [assigneeId], references: [userId])
   alerts   Alert[]
@@ -63,16 +68,19 @@ model Incident {
 // one rule firing. alertId/ruleId/timestamp etc. are assigned upstream by the
 // detection engine (§6) — Prisma just persists what it's given.
 model Alert {
-  alertId    String   @id @map("alert_id")
-  ruleId     String   @map("rule_id")
-  severity   Severity
-  timestamp  DateTime
-  entity     String
-  eventIds   String[] @map("event_ids")
-  message    String
-  count      Int?
-  incidentId String   @map("incident_id")
-  createdAt  DateTime @default(now()) @map("created_at")
+  alertId     String    @id @map("alert_id")
+  ruleId      String    @map("rule_id")
+  severity    Severity
+  timestamp   DateTime
+  entity      String
+  eventIds    String[]  @map("event_ids")
+  message     String
+  count       Int?
+  // earliest evidence the alert cites (MTTD = timestamp - firstSeenAt);
+  // null on alerts recorded before it existed
+  firstSeenAt DateTime? @map("first_seen_at")
+  incidentId  String    @map("incident_id")
+  createdAt   DateTime  @default(now()) @map("created_at")
 
   incident Incident @relation(fields: [incidentId], references: [incidentId])
 

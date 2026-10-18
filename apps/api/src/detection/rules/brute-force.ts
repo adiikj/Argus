@@ -1,4 +1,4 @@
-import type { StatefulRule } from '../rule.js';
+import { windowStart, type StatefulRule } from '../rule.js';
 
 // basic thresholds — tune once you've seen this fire against real traffic.
 const THRESHOLD = 5; // failed logins
@@ -29,6 +29,7 @@ export const bruteForceRule: StatefulRule = {
       eventIds: entries.map((entry) => entry.eventId),
       message: `${entries.length} failed SSH logins for ${event.username ?? 'an unknown user'} from ${event.sourceIp} in the last ${WINDOW_MS / 1000}s`,
       count: entries.length,
+      firstSeenAt: windowStart(entries),
     };
   },
 };

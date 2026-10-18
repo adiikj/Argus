@@ -58,6 +58,7 @@ export async function attachAlert(prisma: PrismaClient, alert: Alert): Promise<C
         eventIds: alert.eventIds,
         message: alert.message,
         count: alert.count,
+        firstSeenAt: alert.firstSeenAt ? new Date(alert.firstSeenAt) : null,
         incidentId: incident.incidentId,
       },
     });
