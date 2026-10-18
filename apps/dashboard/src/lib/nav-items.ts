@@ -6,6 +6,7 @@ import {
   Crosshair,
   ShieldCheck,
   HeartPulse,
+  Timer,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -42,6 +43,12 @@ export const NAV_SECTIONS: NavSection[] = [
         label: 'Incidents',
         icon: FileText,
         description: 'Correlated attacks, triage and AI summaries',
+      },
+      {
+        href: '/soc',
+        label: 'SOC Metrics',
+        icon: Timer,
+        description: 'Detection and response times, false-positive rates',
       },
       {
         href: '/logs',
