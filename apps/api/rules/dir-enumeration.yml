@@ -1,0 +1,35 @@
+title: Sensitive path enumeration
+id: dir-enumeration
+status: stable
+description: >
+  A request for a path only scanners ask for: secrets (.env, .git), admin
+  panels, backups. One request is enough; the path is the classification.
+references:
+  - https://attack.mitre.org/techniques/T1595/003/
+tags:
+  - attack.reconnaissance
+  - attack.t1595.003
+logsource:
+  product: argus
+detection:
+  sensitive_path:
+    path|re: '^/(\.env|\.git|admin|wp-login\.php|phpmyadmin|config\.php|backup\.zip|api/v1/internal)([/?]|$)'
+  condition: sensitive_path
+falsepositives:
+  - A real /admin route on the protected site
+level: medium
+argus:
+  message: 'Sensitive path probe from {sourceIp}: {path}'
+tests:
+  match:
+    - path: /.env
+    - path: /.git/config
+    - path: /wp-login.php
+    - path: /phpmyadmin/index.php?lang=en
+    - path: /admin?next=/
+  nomatch:
+    - path: /index.html
+    - path: /administrator-guide
+    - path: /assets/.envelope.svg
+    - source: auth
+      raw: Failed password for root

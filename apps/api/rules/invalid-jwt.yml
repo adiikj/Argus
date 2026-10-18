@@ -1,0 +1,36 @@
+title: Invalid token use
+id: invalid-jwt
+status: stable
+description: >
+  An API request rejected with 401: an invalid, forged or expired JWT. Noisy
+  by nature on its own; the engine's per-source alert throttle keeps it to
+  one alert a minute.
+references:
+  - https://attack.mitre.org/techniques/T1550/001/
+tags:
+  - attack.defense-evasion
+  - attack.t1550.001
+logsource:
+  product: argus
+  service: api-gateway
+detection:
+  rejected:
+    statusCode: 401
+  condition: rejected
+falsepositives:
+  - Clients holding a token that simply expired
+level: low
+argus:
+  message: 'Invalid or expired token from {sourceIp} on {path|unknown path}'
+tests:
+  match:
+    - path: /api/account
+      statusCode: 401
+  nomatch:
+    - path: /api/account
+      statusCode: 200
+    - path: /api/account
+      statusCode: 403
+    - source: nginx
+      path: /api/account
+      statusCode: 401

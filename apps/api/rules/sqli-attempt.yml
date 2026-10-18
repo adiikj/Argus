@@ -1,0 +1,43 @@
+title: SQL injection attempt
+id: sqli-attempt
+status: stable
+description: >
+  SQL injection syntax in a request path: quote-based OR, UNION SELECT,
+  stacked DROP TABLE, comment terminators and the 1=1 tautology. Checked after
+  URL-decoding until the path stops changing, so %-encoded and double-encoded
+  payloads still match.
+references:
+  - https://attack.mitre.org/techniques/T1190/
+  - https://owasp.org/www-community/attacks/SQL_Injection
+tags:
+  - attack.initial-access
+  - attack.t1190
+logsource:
+  product: argus
+detection:
+  sql_syntax:
+    path|urldecode|re|i:
+      - '''\s*or\s'
+      - '\bunion\s+select\b'
+      - ';\s*drop\s+table\b'
+      - '--'
+      - '\bor\s+1\s*=\s*1\b'
+  condition: sql_syntax
+falsepositives:
+  - Search boxes that pass user text containing "--" or SQL keywords through the URL
+level: high
+argus:
+  message: 'Possible SQL injection from {sourceIp}: {path}'
+tests:
+  match:
+    - path: "/products?id=1' OR '1'='1"
+    - path: /search?q=%27%20UNION%20SELECT%20password%20FROM%20users--
+    - path: /items?id=1;%20DROP%20TABLE%20users
+    - path: /login?user=admin%27--
+    - path: /q?id=%2527%2520or%25201%253D1 # double-encoded
+  nomatch:
+    - path: /index.html
+    - path: /api/orders?id=42
+    - path: /blog/or-else
+    - source: auth
+      raw: Failed password for root

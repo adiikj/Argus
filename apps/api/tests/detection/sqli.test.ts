@@ -1,6 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import type { NormalizedEvent } from '@argus/contracts';
-import { sqliRule, RULE_ID } from '../../src/detection/rules/sqli.js';
+import { statelessRule } from './yaml-rules.js';
+
+const sqliRule = statelessRule('sqli-attempt');
+const RULE_ID = 'sqli-attempt';
 
 // Day 6 spec — drop the `.skip` once you implement the rule (§19). These encode
 // a *proposed* design (severity 'high', entity = sourceIp); tune to taste.

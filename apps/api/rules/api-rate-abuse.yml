@@ -1,0 +1,31 @@
+title: API rate abuse
+id: api-rate-abuse
+status: stable
+description: More than 30 API requests from one source within 10 seconds.
+references:
+  - https://attack.mitre.org/techniques/T1499/003/
+tags:
+  - attack.impact
+  - attack.t1499.003
+logsource:
+  product: argus
+  service: api-gateway
+detection:
+  request:
+    source: api-gateway
+  condition: request | count() by sourceIp > 30
+timeframe: 10s
+falsepositives:
+  - Batch jobs or integrations without client-side rate limiting
+level: medium
+argus:
+  message: '{count} API requests from {sourceIp} in 10s (rate abuse)'
+tests:
+  match:
+    - events: [{ path: /api/login, statusCode: 200, outcome: success }]
+      repeat: 31
+  nomatch:
+    - events: [{ path: /api/login, statusCode: 200, outcome: success }]
+      repeat: 30
+    - events: [{ source: nginx, path: /api/login, statusCode: 200 }]
+      repeat: 40

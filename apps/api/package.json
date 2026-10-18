@@ -27,6 +27,7 @@
     "maxmind": "^5.0.7",
     "prisma": "^6.19.3",
     "redis": "^6.3.0",
+    "yaml": "^2.9.1",
     "zod": "^3.25.76"
   },
   "devDependencies": {

@@ -1,6 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import type { NormalizedEvent } from '@argus/contracts';
-import { invalidJwtRule, RULE_ID } from '../../src/detection/rules/invalid-jwt.js';
+import { statelessRule } from './yaml-rules.js';
+
+const invalidJwtRule = statelessRule('invalid-jwt');
+const RULE_ID = 'invalid-jwt';
 
 // Day 6 spec — remove `.skip` once implemented (§19). Proposed: 401 -> alert,
 // severity 'low', entity = sourceIp.

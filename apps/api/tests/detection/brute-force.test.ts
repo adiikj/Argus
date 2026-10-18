@@ -1,9 +1,12 @@
 import { describe, it, expect } from 'vitest';
 import type { NormalizedEvent } from '@argus/contracts';
-import { bruteForceRule, RULE_ID } from '../../src/detection/rules/brute-force.js';
 import { InMemoryWindowStore } from '../../src/detection/window-store.js';
 import { InMemoryBaselineStore } from '../../src/detection/baseline-store.js';
 import type { RuleContext } from '../../src/detection/rule.js';
+import { statefulRule } from './yaml-rules.js';
+
+const bruteForceRule = statefulRule('brute-force-ssh');
+const RULE_ID = 'brute-force-ssh';
 
 let counter = 0;
 function failure(sourceIp: string): NormalizedEvent {

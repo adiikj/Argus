@@ -3,10 +3,12 @@ import type { NormalizedEvent } from '@argus/contracts';
 import { createRuleEngine } from '../../src/detection/engine.js';
 import { InMemoryWindowStore } from '../../src/detection/window-store.js';
 import { InMemoryBaselineStore } from '../../src/detection/baseline-store.js';
-import { bruteForceRule } from '../../src/detection/rules/brute-force.js';
-import { rateAbuseRule } from '../../src/detection/rules/rate-abuse.js';
-import { sqliRule } from '../../src/detection/rules/sqli.js';
 import { loginAfterBruteForceRule } from '../../src/detection/rules/login-after-brute-force.js';
+import { statefulRule, statelessRule } from './yaml-rules.js';
+
+const bruteForceRule = statefulRule('brute-force-ssh');
+const rateAbuseRule = statefulRule('api-rate-abuse');
+const sqliRule = statelessRule('sqli-attempt');
 
 let n = 0;
 function event(overrides: Partial<NormalizedEvent>): NormalizedEvent {

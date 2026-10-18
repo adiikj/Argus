@@ -1,6 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import type { NormalizedEvent } from '@argus/contracts';
-import { dirEnumRule, RULE_ID } from '../../src/detection/rules/dir-enum.js';
+import { statelessRule } from './yaml-rules.js';
+
+const dirEnumRule = statelessRule('dir-enumeration');
+const RULE_ID = 'dir-enumeration';
 
 // Day 6 spec — remove `.skip` once implemented (§19). Proposed: severity
 // 'medium', entity = sourceIp.

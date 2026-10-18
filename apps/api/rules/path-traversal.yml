@@ -1,0 +1,39 @@
+title: Path traversal attempt
+id: path-traversal
+status: stable
+description: >
+  A parent-directory step (../ or ..\) in the decoded path or query, or the
+  overlong UTF-8 encodings of "." and "/". Those never decode cleanly, so they
+  are matched on the raw path instead.
+references:
+  - https://attack.mitre.org/techniques/T1190/
+  - https://owasp.org/www-community/attacks/Path_Traversal
+tags:
+  - attack.initial-access
+  - attack.t1190
+logsource:
+  product: argus
+detection:
+  dot_dot:
+    path|urldecode|re: '(^|[/\\=])\.\.([/\\]|$)'
+  overlong_utf8:
+    path|re|i: '%c0%ae|%e0%80%ae|%c0%af|%c1%9c'
+  condition: dot_dot or overlong_utf8
+falsepositives:
+  - Clients that send unnormalized relative links (rare; browsers normalize them)
+level: high
+argus:
+  message: 'Path traversal attempt from {sourceIp}: {path}'
+tests:
+  match:
+    - path: /download?file=../../../../etc/passwd
+    - path: /static/..%2f..%2f..%2fetc/shadow
+    - path: /api/files?path=%252e%252e%252f%252e%252e%252fwindows%252fwin.ini
+    - path: /images/%c0%ae%c0%ae/%c0%ae%c0%ae/etc/hosts
+    - path: /x?f=..\..\boot.ini
+    # a junk escape that makes naive whole-string decoding give up
+    - path: /x?f=%252e%252e%252f%252e%252e%252fetc%252fpasswd%zz
+  nomatch:
+    - path: /docs/getting-started/index.html
+    - path: /files/report..final.pdf
+    - path: /api/orders?id=42

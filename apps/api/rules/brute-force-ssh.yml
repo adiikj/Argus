@@ -1,0 +1,37 @@
+title: SSH brute force
+id: brute-force-ssh
+status: stable
+description: >
+  Repeated failed logins for one account from one source: password guessing.
+  Many accounts from one source is spraying, a different rule.
+references:
+  - https://attack.mitre.org/techniques/T1110/001/
+tags:
+  - attack.credential-access
+  - attack.t1110.001
+logsource:
+  product: argus
+  service: auth
+detection:
+  failed_login:
+    outcome: failure
+  condition: failed_login | count() by sourceIp, username >= 5
+timeframe: 60s
+falsepositives:
+  - A user retrying a forgotten password several times in a minute
+level: high
+argus:
+  message: '{count} failed SSH logins for {username|an unknown user} from {sourceIp} in the last 60s'
+tests:
+  match:
+    - events: [{ username: root }]
+      repeat: 5
+    - events: [{ username: root }, { username: deploy }]
+      repeat: 5
+  nomatch:
+    - events: [{ username: root }]
+      repeat: 4
+    # five accounts once each: spraying, not guessing
+    - events: [{ username: a }, { username: b }, { username: c }, { username: d }, { username: e }]
+    - events: [{ username: root, outcome: success }]
+      repeat: 6

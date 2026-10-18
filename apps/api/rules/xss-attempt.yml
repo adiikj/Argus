@@ -1,0 +1,41 @@
+title: Cross-site scripting attempt
+id: xss-attempt
+status: stable
+description: >
+  Script injection in the decoded request: <script> tags, javascript: URLs,
+  inline event handlers on any tag, and the classic proof-of-concept calls.
+  Handlers need the "=" so the bare word "onload" in a search doesn't fire.
+references:
+  - https://attack.mitre.org/techniques/T1059/007/
+tags:
+  - attack.execution
+  - attack.t1059.007
+logsource:
+  product: argus
+detection:
+  script:
+    path|urldecode|re|i:
+      - '<\s*/?\s*script\b'
+      - 'javascript\s*:'
+      - '\bon(error|load|mouseover|focus|click|begin|toggle)\s*='
+      - '<\s*(svg|img|iframe|body|details)\b[^>]*\bon\w+\s*='
+      - 'document\.(cookie|domain)'
+      - '\balert\s*\('
+  condition: script
+falsepositives:
+  - Developer tooling or docs sites that put code samples in query strings
+level: medium
+argus:
+  message: 'Cross-site scripting attempt from {sourceIp}: {path}'
+tests:
+  match:
+    - path: /search?q=%3Cscript%3Ealert(document.cookie)%3C%2Fscript%3E
+    - path: /profile?name=%3Cimg%20src=x%20onerror=alert(1)%3E
+    - path: /redirect?url=javascript:alert(1)
+    - path: /comment?body=%3Csvg%2Fonload%3Dalert(1)%3E
+    - path: /q?x=%253Cscript%253E # double-encoded
+  nomatch:
+    - path: /search?q=onload+event+listener
+    - path: /blog/2026/10/javascript-tips
+    - path: /assets/app.js
+    - path: /

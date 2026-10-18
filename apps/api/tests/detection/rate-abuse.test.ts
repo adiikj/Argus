@@ -1,9 +1,12 @@
 import { describe, it, expect } from 'vitest';
 import type { NormalizedEvent } from '@argus/contracts';
-import { rateAbuseRule, RULE_ID } from '../../src/detection/rules/rate-abuse.js';
 import { InMemoryWindowStore } from '../../src/detection/window-store.js';
 import { InMemoryBaselineStore } from '../../src/detection/baseline-store.js';
 import type { RuleContext } from '../../src/detection/rule.js';
+import { statefulRule } from './yaml-rules.js';
+
+const rateAbuseRule = statefulRule('api-rate-abuse');
+const RULE_ID = 'api-rate-abuse';
 
 // Day 6 spec — remove `.skip` once implemented (§19). Proposed: fire when
 // requests-per-IP in the window exceed the threshold (default 30), severity

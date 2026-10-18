@@ -1,9 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import type { NormalizedEvent } from '@argus/contracts';
 import { decodeRepeatedly } from '../../src/detection/rules/decode.js';
-import { pathTraversalRule } from '../../src/detection/rules/path-traversal.js';
-import { xssRule } from '../../src/detection/rules/xss.js';
-import { commandInjectionRule } from '../../src/detection/rules/command-injection.js';
+import { statelessRule } from './yaml-rules.js';
+
+const pathTraversalRule = statelessRule('path-traversal');
+const xssRule = statelessRule('xss-attempt');
+const commandInjectionRule = statelessRule('command-injection');
 
 function req(path: string): NormalizedEvent {
   return {
