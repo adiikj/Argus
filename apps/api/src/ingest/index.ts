@@ -32,9 +32,9 @@ export interface IngestResult {
   rejected: number;
 }
 
-// the line itself, under whichever key the shipper uses: Vector's file source
-// emits `message`, Fluent Bit's tail input `log`
-const MESSAGE_KEYS = ['message', 'log', 'line'] as const;
+// the line itself, under whichever key the shipper uses: Vector emits
+// `message`, Fluent Bit's tail input `log` and its systemd input `MESSAGE`
+const MESSAGE_KEYS = ['message', 'log', 'MESSAGE', 'line'] as const;
 
 function messageOf(record: Record<string, unknown>): string | undefined {
   for (const key of MESSAGE_KEYS) {

@@ -45,6 +45,15 @@ describe('parseIngestBody', () => {
     });
   });
 
+  it("reads Fluent Bit's systemd input (MESSAGE key)", () => {
+    const line = 'Failed password for invalid user admin from 203.0.113.9 port 40022 ssh2';
+    const { records: logs } = records(
+      parseIngestBody([{ timestamp: '2026-10-18T08:59:00.123456Z', MESSAGE: line }], 'auth', NOW),
+    );
+    expect(logs[0]).toMatchObject({ message: line, timestamp: '2026-10-18T08:59:00.123Z' });
+    expect(parseRawLog(logs[0]!)).toMatchObject({ username: 'admin', outcome: 'failure' });
+  });
+
   it('reads NDJSON and plain text, one record per line', () => {
     const body = `{"message":"one","source":"auth"}\nplain two\n\n{not json\n`;
     const { records: logs } = records(parseIngestBody(body, 'nginx', NOW));
@@ -181,6 +190,25 @@ describe('POST /ingest', () => {
     ).toBe(202);
     expect((await post(app, TOKEN, NGINX_LINE, 'text/plain')).statusCode).toBe(202);
     expect(publish.mock.calls.map((c) => c[0].length)).toEqual([2, 1]);
+  });
+
+  it('takes newline-delimited JSON sent as application/json', async () => {
+    const { app, publish } = await start();
+    const body = `${JSON.stringify({ message: NGINX_LINE })}\n${JSON.stringify({ message: NGINX_LINE })}\n`;
+    const res = await post(app, TOKEN, body);
+    expect(res.statusCode).toBe(202);
+    expect(res.json()).toEqual({ accepted: 2, rejected: 0 });
+  });
+
+  it('keeps strict JSON parsing on every other route', async () => {
+    const { app } = await start();
+    const res = await app.inject({
+      method: 'POST',
+      url: '/auth/login',
+      headers: { 'content-type': 'application/json' },
+      payload: '{"email": ',
+    });
+    expect(res.statusCode).toBe(400);
   });
 
   it('rejects a missing or wrong token, and user sessions', async () => {

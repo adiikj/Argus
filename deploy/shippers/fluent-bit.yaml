@@ -1,0 +1,64 @@
+# Fluent Bit: ship a host's nginx access log and sshd logins to Argus.
+#
+#   export ARGUS_HOST=api.argus.buzz             # your API_HOST, no scheme
+#   export ARGUS_INGEST_TOKEN=<one of INGEST_TOKENS>
+#   fluent-bit -c deploy/shippers/fluent-bit.yaml
+#
+# Each output names its source in the query string (?source=nginx / auth), so
+# the api routes every line to the right parser. Records go out as JSON
+# arrays with an ISO 8601 `timestamp`, which the api keeps as the event time.
+
+service:
+  flush: 2
+  log_level: info
+
+pipeline:
+  inputs:
+    - name: tail
+      tag: argus.nginx
+      path: /var/log/nginx/access.log # combined format
+      db: /var/lib/fluent-bit/argus-nginx.db # remembers the offset across restarts
+      read_from_head: false # live traffic only; no backfill of old lines
+      skip_long_lines: on
+
+    - name: systemd
+      tag: argus.auth
+      systemd_filter:
+        - _SYSTEMD_UNIT=ssh.service # Debian / Ubuntu
+        - _SYSTEMD_UNIT=sshd.service # RHEL / Fedora / Arch
+      systemd_filter_type: or
+      db: /var/lib/fluent-bit/argus-journal.db
+      read_from_tail: on
+
+  filters:
+    # journal records carry a dozen _SYSTEMD_* fields; Argus only reads MESSAGE
+    - name: record_modifier
+      match: argus.auth
+      allowlist_key: MESSAGE
+
+  outputs:
+    - name: http
+      match: argus.nginx
+      host: ${ARGUS_HOST}
+      port: 443
+      tls: on
+      tls.verify: on
+      uri: /ingest?source=nginx
+      format: json
+      json_date_key: timestamp
+      json_date_format: iso8601
+      header: Authorization Bearer ${ARGUS_INGEST_TOKEN}
+      retry_limit: 5
+
+    - name: http
+      match: argus.auth
+      host: ${ARGUS_HOST}
+      port: 443
+      tls: on
+      tls.verify: on
+      uri: /ingest?source=auth
+      format: json
+      json_date_key: timestamp
+      json_date_format: iso8601
+      header: Authorization Bearer ${ARGUS_INGEST_TOKEN}
+      retry_limit: 5

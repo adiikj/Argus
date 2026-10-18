@@ -1,0 +1,62 @@
+# Vector: ship a host's nginx access log and sshd logins to Argus.
+#
+#   export ARGUS_URL=https://api.argus.buzz      # your API_HOST
+#   export ARGUS_INGEST_TOKEN=<one of INGEST_TOKENS>
+#   vector --config deploy/shippers/vector.yaml
+#
+# Each sink names its source in the query string (?source=nginx / auth), so
+# the api routes every line to the right parser. Batches go out as JSON
+# arrays, at most 500 lines or 2 seconds apart.
+
+sources:
+  nginx_access:
+    type: file
+    include:
+      - /var/log/nginx/access.log # combined format
+    read_from: end # live traffic only; no backfill of old lines
+
+  sshd:
+    type: journald
+    include_units:
+      - ssh.service # Debian / Ubuntu
+      - sshd.service # RHEL / Fedora / Arch
+    current_boot_only: true
+
+sinks:
+  argus_nginx:
+    type: http
+    inputs: [nginx_access]
+    uri: '${ARGUS_URL}/ingest?source=nginx'
+    method: post
+    encoding:
+      codec: json
+      only_fields: [message, timestamp]
+    auth:
+      strategy: bearer
+      token: '${ARGUS_INGEST_TOKEN}'
+    batch:
+      max_events: 500
+      timeout_secs: 2
+    buffer:
+      type: memory
+      max_events: 5000
+      when_full: drop_newest # never block the host's log pipeline on Argus
+
+  argus_sshd:
+    type: http
+    inputs: [sshd]
+    uri: '${ARGUS_URL}/ingest?source=auth'
+    method: post
+    encoding:
+      codec: json
+      only_fields: [message, timestamp]
+    auth:
+      strategy: bearer
+      token: '${ARGUS_INGEST_TOKEN}'
+    batch:
+      max_events: 500
+      timeout_secs: 2
+    buffer:
+      type: memory
+      max_events: 5000
+      when_full: drop_newest

@@ -334,37 +334,52 @@ export async function createRealtimeServer(bus: Bus, port: number, opts: Realtim
     return { entries: (await opts.listAudit?.(clampLimit(limit) ?? 100)) ?? [] };
   });
 
-  // NDJSON (Vector's newline-delimited framing) arrives as one string, split
-  // into records by parseIngestBody; text/plain is already a string
-  app.addContentTypeParser('application/x-ndjson', { parseAs: 'string' }, (_req, body, done) =>
-    done(null, body),
-  );
+  // its own scope, so its lenient body parsing stays its own: shippers differ
+  // in how they frame a batch (a JSON array, or newline-delimited JSON sent
+  // as application/json, application/x-ndjson or text/plain). Whatever isn't
+  // one JSON document is handed on as a string, which parseIngestBody splits
+  // into one record per line.
+  await app.register(async (scope) => {
+    scope.removeContentTypeParser(['application/json', 'text/plain']);
+    scope.addContentTypeParser(
+      ['application/json', 'application/x-ndjson', 'text/plain'],
+      { parseAs: 'string' },
+      (_req, body, done) => {
+        const text = body as string;
+        try {
+          done(null, JSON.parse(text));
+        } catch {
+          done(null, text);
+        }
+      },
+    );
 
-  app.post('/ingest', { bodyLimit: 1024 * 1024 }, async (req, reply) => {
-    if (!opts.ingest) {
-      reply.code(404);
-      return { error: 'ingest is not enabled on this instance' };
-    }
-    const bearer = req.headers.authorization?.replace(/^Bearer\s+/i, '');
-    if (!opts.ingest.checkToken(bearer)) {
-      req.log.warn({ ip: req.ip }, 'ingest: rejected token');
-      reply.code(401);
-      return { error: 'invalid ingest token' };
-    }
-    const { source } = req.query as { source?: string };
-    const defaultSource = source === undefined ? undefined : Source.safeParse(source);
-    if (defaultSource && !defaultSource.success) {
-      reply.code(400);
-      return { error: `source must be one of ${Source.options.join(', ')}` };
-    }
-    const result = parseIngestBody(req.body, defaultSource?.data);
-    if ('error' in result) {
-      reply.code(400);
-      return result;
-    }
-    await opts.ingest.publish(result.records);
-    reply.code(202);
-    return { accepted: result.records.length, rejected: result.rejected };
+    scope.post('/ingest', { bodyLimit: 1024 * 1024 }, async (req, reply) => {
+      if (!opts.ingest) {
+        reply.code(404);
+        return { error: 'ingest is not enabled on this instance' };
+      }
+      const bearer = req.headers.authorization?.replace(/^Bearer\s+/i, '');
+      if (!opts.ingest.checkToken(bearer)) {
+        req.log.warn({ ip: req.ip }, 'ingest: rejected token');
+        reply.code(401);
+        return { error: 'invalid ingest token' };
+      }
+      const { source } = req.query as { source?: string };
+      const defaultSource = source === undefined ? undefined : Source.safeParse(source);
+      if (defaultSource && !defaultSource.success) {
+        reply.code(400);
+        return { error: `source must be one of ${Source.options.join(', ')}` };
+      }
+      const result = parseIngestBody(req.body, defaultSource?.data);
+      if ('error' in result) {
+        reply.code(400);
+        return result;
+      }
+      await opts.ingest.publish(result.records);
+      reply.code(202);
+      return { accepted: result.records.length, rejected: result.rejected };
+    });
   });
 
   app.get('/events', async (req) => {
