@@ -6,6 +6,7 @@ export { canTransition } from './transitions.js';
 export {
   patchIncident,
   triageTimestamps,
+  diffIncident,
   type PatchIncidentResult,
   type PatchIncidentError,
 } from './update.js';

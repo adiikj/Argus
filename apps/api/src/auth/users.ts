@@ -1,8 +1,9 @@
 import { randomUUID } from 'node:crypto';
-import type { Role } from '@argus/contracts';
+import type { AdminUser, Role } from '@argus/contracts';
 import type { PrismaClient } from '../incident/index.js';
 import { hashPassword, verifyPassword } from './password.js';
 import type { GoogleProfile } from './google.js';
+import { recordAudit, type Actor } from '../audit/index.js';
 
 export interface AuthUser {
   userId: string;
@@ -127,4 +128,55 @@ export async function upsertGoogleUser(
     },
   });
   return toAuthUser(created);
+}
+
+export async function listAdminUsers(prisma: PrismaClient): Promise<AdminUser[]> {
+  const users = await prisma.user.findMany({ orderBy: { createdAt: 'asc' } });
+  return users.map((u) => ({
+    userId: u.userId,
+    email: u.email,
+    name: u.name,
+    role: u.role,
+    createdAt: u.createdAt.toISOString(),
+    signIn: [
+      ...(u.passwordHash ? (['password'] as const) : []),
+      ...(u.googleId ? (['google'] as const) : []),
+    ],
+  }));
+}
+
+export type SetRoleResult =
+  { ok: true; user: AuthUser } | { ok: false; error: 'not_found' | 'last_admin' };
+
+// admin-only role change, audited. Refuses to demote the last admin: with
+// self-registration off there would be no way back short of the CLI.
+// Serializable so two admins demoting each other at once can't both succeed.
+export async function setUserRole(
+  prisma: PrismaClient,
+  actor: Actor | null,
+  userId: string,
+  role: Role,
+): Promise<SetRoleResult> {
+  return prisma.$transaction(
+    async (tx) => {
+      const user = await tx.user.findUnique({ where: { userId } });
+      if (!user) return { ok: false, error: 'not_found' } as const;
+      if (user.role === role) return { ok: true, user: toAuthUser(user) } as const;
+      if (user.role === 'admin' && (await tx.user.count({ where: { role: 'admin' } })) <= 1) {
+        return { ok: false, error: 'last_admin' } as const;
+      }
+      const updated = await tx.user.update({ where: { userId }, data: { role } });
+      await recordAudit(tx, actor, [
+        { action: 'user.role', targetType: 'user', targetId: userId, from: user.role, to: role },
+      ]);
+      return { ok: true, user: toAuthUser(updated) } as const;
+    },
+    { isolationLevel: 'Serializable' },
+  );
+}
+
+// the role a user holds right now (undefined = account gone)
+export async function currentRole(prisma: PrismaClient, userId: string): Promise<Role | undefined> {
+  const user = await prisma.user.findUnique({ where: { userId }, select: { role: true } });
+  return user?.role;
 }

@@ -6,5 +6,12 @@ export {
   type AuthResult,
   type RegisterResult,
 } from './service.js';
-export { listUsers, setPasswordUser, type AuthUser } from './users.js';
+export {
+  listUsers,
+  listAdminUsers,
+  setPasswordUser,
+  setUserRole,
+  type AuthUser,
+  type SetRoleResult,
+} from './users.js';
 export { canAccess } from './permissions.js';

@@ -10,6 +10,10 @@ import {
   type NormalizedEvent,
   type PublicUser,
   type RecentActivity,
+  type AdminUser,
+  type AuditEntry,
+  type Role,
+  RolePatch,
   type SocMetrics,
 } from '@argus/contracts';
 import type { AppConfig } from '@argus/config';
@@ -17,8 +21,16 @@ import type { Bus, IncidentEvent } from '../bus/index.js';
 import { clampDays, type IncidentDetail, type PatchIncidentResult } from '../incident/index.js';
 import type { EventSearchParams } from '../storage/index.js';
 import type { SystemHealth } from '../system/index.js';
-import { canAccess, type AuthService } from '../auth/index.js';
+import { canAccess, type AuthService, type SetRoleResult } from '../auth/index.js';
 import { RateLimiter } from './rate-limit.js';
+import { redactActors, type Actor } from '../audit/index.js';
+
+declare module 'fastify' {
+  interface FastifyRequest {
+    // the verified caller, set by the auth hook; null while the gate is open
+    actor: Actor | null;
+  }
+}
 
 const UNGATED_PATHS = ['/healthz', '/auth/login', '/auth/register', '/auth/google', '/auth/status'];
 
@@ -51,11 +63,18 @@ export interface EventTrace {
 export interface RealtimeOptions {
   getMetrics?: () => unknown;
   getIncidentDetail?: (id: string) => Promise<IncidentDetail | undefined>;
-  patchIncident?: (id: string, input: IncidentPatch) => Promise<PatchIncidentResult>;
+  patchIncident?: (
+    id: string,
+    input: IncidentPatch,
+    actor: Actor | null,
+  ) => Promise<PatchIncidentResult>;
   queryIncidents?: (question: string) => Promise<IncidentQueryResult>;
   getRecentActivity?: () => Promise<RecentActivity>;
   getSocMetrics?: (days: number) => Promise<SocMetrics>;
   listUsers?: () => Promise<PublicUser[]>;
+  listAdminUsers?: () => Promise<AdminUser[]>;
+  setUserRole?: (actor: Actor | null, userId: string, role: Role) => Promise<SetRoleResult>;
+  listAudit?: (limit: number) => Promise<AuditEntry[]>;
   searchEvents?: (params: EventSearchParams) => Promise<NormalizedEvent[]>;
   getEventTrace?: (eventId: string) => Promise<EventTrace>;
   getSystemHealth?: () => Promise<SystemHealth>;
@@ -69,6 +88,7 @@ export interface RealtimeOptions {
 
 export async function createRealtimeServer(bus: Bus, port: number, opts: RealtimeOptions) {
   const app = Fastify({ trustProxy: opts.trustProxy ?? false });
+  app.decorateRequest('actor', null);
   await app.register(websocketPlugin);
 
   const corsOrigins = opts.corsOrigins ?? ['*'];
@@ -140,8 +160,11 @@ export async function createRealtimeServer(bus: Bus, port: number, opts: Realtim
       return reply.code(401).send({ error: 'unauthorized' });
     }
     if (!canAccess(payload.role, req.method, req.url)) {
-      return reply.code(403).send({ error: 'read-only account' });
+      return reply
+        .code(403)
+        .send({ error: payload.role === 'viewer' ? 'read-only account' : 'admins only' });
     }
+    req.actor = { userId: payload.sub, email: payload.email, role: payload.role };
   });
 
   const sockets = new Set<WebSocket>();
@@ -222,7 +245,9 @@ export async function createRealtimeServer(bus: Bus, port: number, opts: Realtim
       reply.code(404);
       return { error: 'incident not found' };
     }
-    return detail;
+    return req.actor?.role === 'viewer'
+      ? { ...detail, activity: redactActors(detail.activity) }
+      : detail;
   });
 
   app.patch('/incidents/:id', async (req, reply) => {
@@ -233,7 +258,7 @@ export async function createRealtimeServer(bus: Bus, port: number, opts: Realtim
       return { error: 'invalid patch body' };
     }
 
-    const result = await opts.patchIncident?.(id, body.data);
+    const result = await opts.patchIncident?.(id, body.data, req.actor);
     if (!result) {
       reply.code(404);
       return { error: 'incident not found' };
@@ -267,6 +292,31 @@ export async function createRealtimeServer(bus: Bus, port: number, opts: Realtim
   });
 
   app.get('/users', async () => ({ users: (await opts.listUsers?.()) ?? [] }));
+
+  // admin only (canAccess): the gate stops everyone else before these run
+  app.get('/admin/users', async () => ({ users: (await opts.listAdminUsers?.()) ?? [] }));
+
+  app.patch('/admin/users/:id', async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const body = RolePatch.safeParse(req.body);
+    if (!body.success) {
+      reply.code(400);
+      return { error: 'invalid role' };
+    }
+    const result = await opts.setUserRole?.(req.actor, id, body.data.role);
+    if (!result || !result.ok) {
+      const error = result?.error ?? 'not_found';
+      reply.code(error === 'not_found' ? 404 : 409);
+      return { error };
+    }
+    opts.auth.forgetRole(id);
+    return result.user;
+  });
+
+  app.get('/admin/audit', async (req) => {
+    const { limit } = req.query as { limit?: string };
+    return { entries: (await opts.listAudit?.(clampLimit(limit) ?? 100)) ?? [] };
+  });
 
   app.get('/events', async (req) => {
     const { q, source, limit } = req.query as { q?: string; source?: string; limit?: string };

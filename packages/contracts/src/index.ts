@@ -225,3 +225,44 @@ export const SocMetrics = z.object({
   ),
 });
 export type SocMetrics = z.infer<typeof SocMetrics>;
+
+// one row of the audit trail. from/to hold the old and new value: a status,
+// an assignee's userId, a resolution note, a role.
+export const AuditAction = z.enum([
+  'incident.status',
+  'incident.assignee',
+  'incident.note',
+  'user.role',
+]);
+export type AuditAction = z.infer<typeof AuditAction>;
+
+export const AuditEntry = z.object({
+  id: z.string().uuid(),
+  at: z.string().datetime(),
+  // null = a change made while the login gate was still open (fresh dev
+  // install). email is null when the reader may not see other accounts' emails.
+  actor: z
+    .object({ userId: z.string(), email: z.string().nullable(), role: Role.nullable() })
+    .nullable(),
+  action: AuditAction,
+  targetType: z.enum(['incident', 'user']),
+  targetId: z.string(),
+  from: z.string().nullable(),
+  to: z.string().nullable(),
+});
+export type AuditEntry = z.infer<typeof AuditEntry>;
+
+// GET /admin/users — the full account list, admins only
+export const AdminUser = z.object({
+  userId: z.string().uuid(),
+  email: z.string().email(),
+  name: z.string().nullable(),
+  role: Role,
+  createdAt: z.string().datetime(),
+  signIn: z.array(z.enum(['password', 'google'])),
+});
+export type AdminUser = z.infer<typeof AdminUser>;
+
+// PATCH /admin/users/:id body
+export const RolePatch = z.object({ role: Role });
+export type RolePatch = z.infer<typeof RolePatch>;

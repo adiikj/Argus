@@ -19,6 +19,7 @@ function stubAuth(opts: { required: boolean; registrationOpen: boolean }): AuthS
       ['admin', 'analyst', 'viewer'].includes(token)
         ? { sub: 'u', email: 'u@example.com', role: token as Role }
         : undefined,
+    forgetRole: () => {},
   };
 }
 
@@ -163,5 +164,115 @@ describe('GET /incidents geo enrichment', () => {
       { country: 'JP', countryName: 'Japan', lat: 1, lng: 2, source: 'simulated' },
       null,
     ]);
+  });
+});
+
+describe('admin routes + audit actor', () => {
+  const as = (token: string) => ({ authorization: `Bearer ${token}` });
+
+  it('keeps /admin/* for admins only', async () => {
+    const setUserRole = vi.fn(async () => ({
+      ok: true as const,
+      user: { userId: 'x', email: 'x@example.com', name: null, role: 'viewer' as const },
+    }));
+    const app = await createRealtimeServer(createBus(), 0, {
+      auth: stubAuth({ required: true, registrationOpen: false }),
+      listAdminUsers: async () => [],
+      setUserRole,
+      listAudit: async () => [],
+    });
+    const roleChange = (token: string) =>
+      app.inject({
+        method: 'PATCH',
+        url: '/admin/users/00000000-0000-4000-8000-000000000001',
+        headers: as(token),
+        payload: { role: 'viewer' },
+      });
+    try {
+      for (const token of ['analyst', 'viewer']) {
+        expect((await app.inject({ url: '/admin/users', headers: as(token) })).statusCode).toBe(
+          403,
+        );
+        expect((await app.inject({ url: '/admin/audit', headers: as(token) })).statusCode).toBe(
+          403,
+        );
+        expect((await roleChange(token)).statusCode).toBe(403);
+      }
+      expect(setUserRole).not.toHaveBeenCalled();
+
+      expect((await app.inject({ url: '/admin/users', headers: as('admin') })).statusCode).toBe(
+        200,
+      );
+      expect((await roleChange('admin')).statusCode).toBe(200);
+      expect(setUserRole).toHaveBeenCalledWith(
+        { userId: 'u', email: 'u@example.com', role: 'admin' },
+        '00000000-0000-4000-8000-000000000001',
+        'viewer',
+      );
+    } finally {
+      await app.close();
+    }
+  });
+
+  it('refuses to demote the last admin', async () => {
+    const app = await createRealtimeServer(createBus(), 0, {
+      auth: stubAuth({ required: true, registrationOpen: false }),
+      setUserRole: async () => ({ ok: false, error: 'last_admin' }),
+    });
+    const res = await app.inject({
+      method: 'PATCH',
+      url: '/admin/users/u',
+      headers: as('admin'),
+      payload: { role: 'analyst' },
+    });
+    await app.close();
+    expect(res.statusCode).toBe(409);
+    expect(res.json()).toEqual({ error: 'last_admin' });
+  });
+
+  it('passes the caller to patchIncident as the audit actor', async () => {
+    const { app, patchIncident } = await start(
+      stubAuth({ required: true, registrationOpen: false }),
+    );
+    await patch(app, 'analyst');
+    expect(patchIncident).toHaveBeenCalledWith(
+      '00000000-0000-0000-0000-000000000000',
+      { status: 'acknowledged' },
+      { userId: 'u', email: 'u@example.com', role: 'analyst' },
+    );
+  });
+
+  it('hides actor emails from viewers on the incident activity trail', async () => {
+    const entry = {
+      id: '00000000-0000-4000-8000-000000000009',
+      at: '2026-10-18T09:00:00.000Z',
+      actor: { userId: 'a', email: 'admin@example.com', role: 'admin' as const },
+      action: 'incident.status' as const,
+      targetType: 'incident' as const,
+      targetId: 'i',
+      from: 'open',
+      to: 'acknowledged',
+    };
+    const app = await createRealtimeServer(createBus(), 0, {
+      auth: stubAuth({ required: true, registrationOpen: false }),
+      getIncidentDetail: async () => ({
+        incident: {} as never,
+        alerts: [],
+        summary: undefined,
+        activity: [entry],
+      }),
+    });
+    const read = async (token: string) =>
+      (
+        (await app.inject({ url: '/incidents/i', headers: as(token) })).json() as {
+          activity: Array<{ actor: { email: string | null } }>;
+        }
+      ).activity[0]!.actor.email;
+    try {
+      expect(await read('analyst')).toBe('admin@example.com');
+      expect(await read('viewer')).toBeNull();
+    } finally {
+      await app.close();
+    }
   });
 });

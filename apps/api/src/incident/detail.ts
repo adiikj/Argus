@@ -1,6 +1,7 @@
 import type { PrismaClient } from '../../generated/prisma/index.js';
-import type { Alert, Incident, IncidentSummary } from '@argus/contracts';
+import type { Alert, AuditEntry, Incident, IncidentSummary } from '@argus/contracts';
 import { incidentRowToContract, alertRowToContract, summaryRowToContract } from './mappers.js';
+import { getIncidentActivity } from '../audit/index.js';
 
 export interface IncidentWithAlerts {
   incident: Incident;
@@ -24,6 +25,8 @@ export async function loadIncidentWithAlerts(
 
 export interface IncidentDetail extends IncidentWithAlerts {
   summary: IncidentSummary | undefined;
+  // who triaged it and how, oldest first (the audit trail for this incident)
+  activity: AuditEntry[];
 }
 
 export async function getIncidentDetail(
@@ -33,6 +36,9 @@ export async function getIncidentDetail(
   const base = await loadIncidentWithAlerts(prisma, incidentId);
   if (!base) return undefined;
 
-  const summaryRow = await prisma.summary.findUnique({ where: { incidentId } });
-  return { ...base, summary: summaryRow ? summaryRowToContract(summaryRow) : undefined };
+  const [summaryRow, activity] = await Promise.all([
+    prisma.summary.findUnique({ where: { incidentId } }),
+    getIncidentActivity(prisma, incidentId),
+  ]);
+  return { ...base, summary: summaryRow ? summaryRowToContract(summaryRow) : undefined, activity };
 }

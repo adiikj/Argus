@@ -7,7 +7,7 @@ const TOKEN_TTL = '7d';
 export interface AppTokenPayload {
   sub: string;
   email: string;
-  // baked in at sign-in: a role change applies from the user's next login
+  // the role at sign-in; the api's auth service re-reads the live one
   role: Role;
 }
 

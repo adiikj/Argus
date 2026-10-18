@@ -165,3 +165,24 @@ model User {
 
   @@map("users")
 }
+
+// append-only record of who changed what: incident triage (status,
+// assignee, resolution note) and user role changes. No foreign key to users
+// on purpose: the trail outlives the account that made the change, so the
+// actor's email and role are copied in at write time.
+model AuditEntry {
+  id         String   @id
+  at         DateTime @default(now())
+  actorId    String?  @map("actor_id")
+  actorEmail String?  @map("actor_email")
+  actorRole  Role?    @map("actor_role")
+  action     String
+  targetType String   @map("target_type")
+  targetId   String   @map("target_id")
+  fromValue  String?  @map("from_value")
+  toValue    String?  @map("to_value")
+
+  @@index([targetType, targetId, at])
+  @@index([at])
+  @@map("audit_log")
+}

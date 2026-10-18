@@ -1,6 +1,13 @@
+import type { Role } from '@argus/contracts';
 import type { PrismaClient } from '../incident/index.js';
 import { signToken, verifyToken, type AppTokenPayload } from './token.js';
-import { registerUser, loginWithPassword, upsertGoogleUser, type AuthUser } from './users.js';
+import {
+  currentRole,
+  registerUser,
+  loginWithPassword,
+  upsertGoogleUser,
+  type AuthUser,
+} from './users.js';
 import { verifyGoogleIdToken } from './google.js';
 
 export interface AuthResult {
@@ -19,7 +26,12 @@ export interface AuthService {
   login(email: string, password: string): Promise<AuthResult | undefined>;
   loginWithGoogle(idToken: string): Promise<AuthResult | undefined>;
   verify(token: string): Promise<AppTokenPayload | undefined>;
+  // drop a user's cached role after an admin changes it
+  forgetRole(userId: string): void;
 }
+
+// how long a looked-up role is trusted before asking Postgres again
+const ROLE_TTL_MS = 30_000;
 
 // two gate modes:
 //   - registration open (dev default): the gate activates the moment the
@@ -38,6 +50,7 @@ export async function createAuthService(
   opts: { authSecret: string; googleClientId?: string; allowRegistration: boolean },
 ): Promise<AuthService> {
   let required = !opts.allowRegistration || (await prisma.user.count()) > 0;
+  const roles = new Map<string, { role: Role; at: number }>();
 
   const issue = async (user: AuthUser): Promise<AuthResult> => ({
     user,
@@ -78,6 +91,22 @@ export async function createAuthService(
       return issue(user);
     },
 
-    verify: (token) => verifyToken(token, opts.authSecret),
+    // the token proves who the caller is; the role comes from the database
+    // (cached briefly), so a demotion or a deleted account takes effect
+    // within ROLE_TTL_MS instead of whenever the 7-day token expires
+    async verify(token) {
+      const payload = await verifyToken(token, opts.authSecret);
+      if (!payload) return undefined;
+      const cached = roles.get(payload.sub);
+      let role = cached && Date.now() - cached.at < ROLE_TTL_MS ? cached.role : undefined;
+      if (!role) {
+        role = await currentRole(prisma, payload.sub);
+        if (!role) return undefined;
+        roles.set(payload.sub, { role, at: Date.now() });
+      }
+      return { ...payload, role };
+    },
+
+    forgetRole: (userId) => void roles.delete(userId),
   };
 }

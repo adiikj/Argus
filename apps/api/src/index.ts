@@ -50,7 +50,14 @@ import { getSystemHealth } from './system/index.js';
 import { startRetention } from './retention/index.js';
 import { createGeoLocator } from './geo/index.js';
 import { createThreatIntel } from './intel/index.js';
-import { createAuthService, listUsers, type AuthService } from './auth/index.js';
+import {
+  createAuthService,
+  listAdminUsers,
+  listUsers,
+  setUserRole,
+  type AuthService,
+} from './auth/index.js';
+import { listAudit } from './audit/index.js';
 
 const config = loadConfig();
 const log = createLogger({ name: 'api', level: config.LOG_LEVEL });
@@ -166,7 +173,7 @@ async function startRealtime(
         reputation: (await intel.cached(detail.incident.correlationKey)) ?? null,
       };
     },
-    patchIncident: (id, input) => patchIncident(prisma, id, input),
+    patchIncident: (id, input, actor) => patchIncident(prisma, id, input, actor),
     getRecentActivity: () => getRecentActivity(prisma),
     getSocMetrics: (days) => getSocMetrics(prisma, days),
     queryIncidents: async (question) => {
@@ -174,6 +181,9 @@ async function startRealtime(
       return { filter, incidents: await searchIncidents(prisma, filter) };
     },
     listUsers: () => listUsers(prisma),
+    listAdminUsers: () => listAdminUsers(prisma),
+    setUserRole: (actor, userId, role) => setUserRole(prisma, actor, userId, role),
+    listAudit: (limit) => listAudit(prisma, limit),
     searchEvents: (params) => eventStore.search(params),
     getEventTrace: async (eventId) => {
       const [event, { alerts, incidents }] = await Promise.all([
