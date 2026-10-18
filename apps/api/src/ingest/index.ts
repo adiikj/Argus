@@ -1,6 +1,11 @@
 import { createHash, randomUUID, timingSafeEqual } from 'node:crypto';
 import { Source, type RawLog } from '@argus/contracts';
 
+// what a shipper may send. 'argus' is reserved for the api's own security
+// events: accepting it here would let an ingest token forge them.
+export const IngestSource = Source.exclude(['argus']);
+export type IngestSource = (typeof IngestSource)['_type'];
+
 // POST /ingest: real logs from outside the pipeline (a Vector or Fluent Bit
 // agent tailing nginx / sshd logs) straight onto raw.logs, where the same
 // parsers and rules as the simulated traffic pick them up.
@@ -58,7 +63,7 @@ function timestampOf(record: Record<string, unknown>, now: number): string {
 
 function toRawLog(
   item: unknown,
-  defaultSource: Source | undefined,
+  defaultSource: IngestSource | undefined,
   now: number,
 ): RawLog | undefined {
   const record: Record<string, unknown> =
@@ -68,7 +73,7 @@ function toRawLog(
         ? (item as Record<string, unknown>)
         : {};
   const message = messageOf(record)?.replace(/\r?\n$/, '');
-  const source = Source.safeParse(record.source ?? defaultSource);
+  const source = IngestSource.safeParse(record.source ?? defaultSource);
   if (!message || !source.success || Buffer.byteLength(message) > MAX_LINE_BYTES) return undefined;
   return {
     eventId: randomUUID(),
@@ -83,7 +88,7 @@ function toRawLog(
 // object is a record; any other line is the raw log line itself.
 export function parseIngestBody(
   body: unknown,
-  defaultSource: Source | undefined,
+  defaultSource: IngestSource | undefined,
   now: number = Date.now(),
 ): IngestResult | { error: string } {
   let items: unknown[];

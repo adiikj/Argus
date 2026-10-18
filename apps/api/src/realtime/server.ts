@@ -1,4 +1,4 @@
-import Fastify from 'fastify';
+import Fastify, { type FastifyRequest } from 'fastify';
 import websocketPlugin, { type WebSocket } from '@fastify/websocket';
 import {
   IncidentPatch,
@@ -16,7 +16,6 @@ import {
   RolePatch,
   type SocMetrics,
   type RawLog,
-  Source,
 } from '@argus/contracts';
 import type { AppConfig } from '@argus/config';
 import type { Bus, IncidentEvent } from '../bus/index.js';
@@ -26,7 +25,8 @@ import type { SystemHealth } from '../system/index.js';
 import { canAccess, type AuthService, type SetRoleResult } from '../auth/index.js';
 import { RateLimiter } from './rate-limit.js';
 import { redactActors, type Actor } from '../audit/index.js';
-import { parseIngestBody } from '../ingest/index.js';
+import { IngestSource, parseIngestBody } from '../ingest/index.js';
+import { maskEmail, stripQuery, type SecurityEvent } from '../selfmon/index.js';
 
 declare module 'fastify' {
   interface FastifyRequest {
@@ -86,6 +86,8 @@ export interface RealtimeOptions {
   listAdminUsers?: () => Promise<AdminUser[]>;
   setUserRole?: (actor: Actor | null, userId: string, role: Role) => Promise<SetRoleResult>;
   listAudit?: (limit: number) => Promise<AuditEntry[]>;
+  // self-monitoring sink for the api's own auth events (apps/api/src/selfmon)
+  onSecurityEvent?: (event: SecurityEvent) => void;
   // POST /ingest; absent = the route answers 404 (no INGEST_TOKENS configured)
   ingest?: {
     checkToken: (token: string | undefined) => boolean;
@@ -105,6 +107,32 @@ export interface RealtimeOptions {
 export async function createRealtimeServer(bus: Bus, port: number, opts: RealtimeOptions) {
   const app = Fastify({ trustProxy: opts.trustProxy ?? false });
   app.decorateRequest('actor', null);
+
+  // self-monitoring: auth outcomes onto the pipeline (see selfmon). Never
+  // allowed to fail or slow the request that produced it.
+  const security = (
+    req: FastifyRequest,
+    status: number,
+    outcome: SecurityEvent['outcome'],
+    reason: string,
+    email?: string,
+  ): void => {
+    if (!opts.onSecurityEvent) return;
+    try {
+      opts.onSecurityEvent({
+        ip: req.ip,
+        method: req.method,
+        path: stripQuery(req.url),
+        status,
+        outcome,
+        reason,
+        user: maskEmail(email),
+        userAgent: req.headers['user-agent'],
+      });
+    } catch (err) {
+      req.log.warn({ err }, 'security event not recorded');
+    }
+  };
   await app.register(websocketPlugin);
 
   const corsOrigins = opts.corsOrigins ?? ['*'];
@@ -173,9 +201,13 @@ export async function createRealtimeServer(bus: Bus, port: number, opts: Realtim
 
     const payload = token ? await opts.auth.verify(token) : undefined;
     if (!payload) {
+      // no token at all is every scanner on the internet, already in the
+      // nginx probe log; a token that fails verification is worth a line
+      if (token) security(req, 401, 'failure', 'invalid session token');
       return reply.code(401).send({ error: 'unauthorized' });
     }
     if (!canAccess(payload.role, req.method, req.url)) {
+      security(req, 403, 'failure', `${payload.role} not allowed`, payload.email);
       return reply
         .code(403)
         .send({ error: payload.role === 'viewer' ? 'read-only account' : 'admins only' });
@@ -220,9 +252,11 @@ export async function createRealtimeServer(bus: Bus, port: number, opts: Realtim
     const { email, password } = (req.body ?? {}) as { email?: string; password?: string };
     const result = email && password ? await opts.auth.login(email, password) : undefined;
     if (!result) {
+      security(req, 401, 'failure', 'bad email or password', email);
       reply.code(401);
       return { error: 'invalid email or password' };
     }
+    security(req, 200, 'success', 'password login', result.user.email);
     return { token: result.token };
   });
 
@@ -230,9 +264,11 @@ export async function createRealtimeServer(bus: Bus, port: number, opts: Realtim
     const { credential } = (req.body ?? {}) as { credential?: string };
     const result = credential ? await opts.auth.loginWithGoogle(credential) : undefined;
     if (!result) {
+      security(req, 401, 'failure', 'Google credential rejected');
       reply.code(401);
       return { error: 'invalid Google credential' };
     }
+    security(req, 200, 'success', 'Google login', result.user.email);
     return { token: result.token };
   });
 
@@ -361,15 +397,15 @@ export async function createRealtimeServer(bus: Bus, port: number, opts: Realtim
       }
       const bearer = req.headers.authorization?.replace(/^Bearer\s+/i, '');
       if (!opts.ingest.checkToken(bearer)) {
-        req.log.warn({ ip: req.ip }, 'ingest: rejected token');
+        security(req, 401, 'failure', 'invalid ingest token');
         reply.code(401);
         return { error: 'invalid ingest token' };
       }
       const { source } = req.query as { source?: string };
-      const defaultSource = source === undefined ? undefined : Source.safeParse(source);
+      const defaultSource = source === undefined ? undefined : IngestSource.safeParse(source);
       if (defaultSource && !defaultSource.success) {
         reply.code(400);
-        return { error: `source must be one of ${Source.options.join(', ')}` };
+        return { error: `source must be one of ${IngestSource.options.join(', ')}` };
       }
       const result = parseIngestBody(req.body, defaultSource?.data);
       if ('error' in result) {

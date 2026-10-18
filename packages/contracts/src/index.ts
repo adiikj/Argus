@@ -12,7 +12,10 @@ export const SEVERITY_RANK: Record<Severity, number> = {
   critical: 4,
 };
 
-export const Source = z.enum(['auth', 'api-gateway', 'nginx']);
+// 'argus' is the platform watching itself: its own login, session and ingest
+// auth events, emitted by the api onto the same pipeline (never accepted
+// from outside through POST /ingest)
+export const Source = z.enum(['auth', 'api-gateway', 'nginx', 'argus']);
 export type Source = z.infer<typeof Source>;
 
 export const Outcome = z.enum(['success', 'failure']);

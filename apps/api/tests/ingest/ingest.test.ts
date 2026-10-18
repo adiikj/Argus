@@ -193,7 +193,7 @@ describe('POST /ingest', () => {
   });
 
   it('takes newline-delimited JSON sent as application/json', async () => {
-    const { app, publish } = await start();
+    const { app } = await start();
     const body = `${JSON.stringify({ message: NGINX_LINE })}\n${JSON.stringify({ message: NGINX_LINE })}\n`;
     const res = await post(app, TOKEN, body);
     expect(res.statusCode).toBe(202);

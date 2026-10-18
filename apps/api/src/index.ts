@@ -59,6 +59,7 @@ import {
 } from './auth/index.js';
 import { listAudit } from './audit/index.js';
 import { createTokenCheck } from './ingest/index.js';
+import { securityEventLog } from './selfmon/index.js';
 
 const config = loadConfig();
 const log = createLogger({ name: 'api', level: config.LOG_LEVEL });
@@ -190,6 +191,12 @@ async function startRealtime(
     listAdminUsers: () => listAdminUsers(prisma),
     setUserRole: (actor, userId, role) => setUserRole(prisma, actor, userId, role),
     listAudit: (limit) => listAudit(prisma, limit),
+    // self-monitoring: fire and forget, a slow broker must not hold up a login
+    onSecurityEvent: (event) => {
+      producer
+        .send(TOPICS.RAW_LOGS, event.ip, securityEventLog(event))
+        .catch((err: unknown) => log.warn({ err }, 'security event not published'));
+    },
     ingest:
       config.INGEST_TOKENS.length > 0
         ? {
