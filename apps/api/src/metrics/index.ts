@@ -4,6 +4,7 @@
 export interface MetricsSnapshot {
   uptimeSeconds: number;
   rawLogsConsumed: number;
+  logsIngested: number; // accepted through POST /ingest
   eventsNormalized: number;
   parseFailures: number;
   eventsIndexed: number;
@@ -25,6 +26,7 @@ export function createMetrics(): Metrics {
   const startedAt = Date.now();
   const counters: Record<Counter, number> = {
     rawLogsConsumed: 0,
+    logsIngested: 0,
     eventsNormalized: 0,
     parseFailures: 0,
     eventsIndexed: 0,

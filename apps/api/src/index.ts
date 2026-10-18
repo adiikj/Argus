@@ -58,6 +58,7 @@ import {
   type AuthService,
 } from './auth/index.js';
 import { listAudit } from './audit/index.js';
+import { createTokenCheck } from './ingest/index.js';
 
 const config = loadConfig();
 const log = createLogger({ name: 'api', level: config.LOG_LEVEL });
@@ -73,14 +74,19 @@ async function startParser(kafka: Kafka, producer: StreamProducer, m: Metrics): 
   await subscribe(kafka, 'api-parser', TOPICS.RAW_LOGS, async (value) => {
     m.incr('rawLogsConsumed');
     const rawLog = RawLog.parse(value);
-    const normalized = parseRawLog(rawLog);
-    if (!normalized) {
+    const parsed = parseRawLog(rawLog);
+    // validated here, once: a malformed event published downstream would make
+    // every consumer's NormalizedEvent.parse throw, and a handler that throws
+    // never commits its offset, so one bad line (say, a hostname where an IP
+    // belongs, via POST /ingest) would be redelivered forever
+    const normalized = parsed && NormalizedEvent.safeParse(parsed);
+    if (!normalized?.success) {
       m.incr('parseFailures');
       log.warn({ rawLog }, 'no parser matched raw log, skipping');
       return;
     }
     m.incr('eventsNormalized');
-    await producer.send(TOPICS.EVENTS_NORMALIZED, normalized.sourceIp, normalized);
+    await producer.send(TOPICS.EVENTS_NORMALIZED, normalized.data.sourceIp, normalized.data);
   });
 }
 
@@ -184,6 +190,19 @@ async function startRealtime(
     listAdminUsers: () => listAdminUsers(prisma),
     setUserRole: (actor, userId, role) => setUserRole(prisma, actor, userId, role),
     listAudit: (limit) => listAudit(prisma, limit),
+    ingest:
+      config.INGEST_TOKENS.length > 0
+        ? {
+            checkToken: createTokenCheck(config.INGEST_TOKENS),
+            publish: async (records) => {
+              await producer.sendMany(
+                TOPICS.RAW_LOGS,
+                records.map((r) => ({ key: r.source, value: r })),
+              );
+              m.incr('logsIngested', records.length);
+            },
+          }
+        : undefined,
     searchEvents: (params) => eventStore.search(params),
     getEventTrace: async (eventId) => {
       const [event, { alerts, incidents }] = await Promise.all([

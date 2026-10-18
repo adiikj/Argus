@@ -36,6 +36,19 @@ export const TrustProxy = z
       .filter(Boolean);
   });
 
+export const IngestTokens = z
+  .string()
+  .default('')
+  .transform((s) =>
+    s
+      .split(',')
+      .map((t) => t.trim())
+      .filter(Boolean),
+  )
+  .refine((tokens) => tokens.every((t) => t.length >= 32), {
+    message: 'every INGEST_TOKENS entry must be at least 32 characters',
+  });
+
 const EnvSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace']).default('info'),
@@ -118,6 +131,11 @@ const EnvSchema = z.object({
   // extra infra); set it to back both with Redis (sorted sets / pub-sub) so
   // detection state and event fanout survive across more than one api process
   REDIS_URL: z.string().optional(),
+
+  // bearer tokens for POST /ingest (log shippers such as Vector or Fluent Bit),
+  // comma-separated so one can be rotated out while the next is rolled in.
+  // Unset = ingest disabled. Each needs 32+ chars: openssl rand -hex 32
+  INGEST_TOKENS: IngestTokens,
 
   // optional: AbuseIPDB reputation for incidents from real public IPs (free
   // tier: 1,000 checks/day; Argus caps itself at 900). Unset = no lookups.

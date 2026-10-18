@@ -36,3 +36,38 @@ describe('parseAuthLog', () => {
     expect(parseAuthLog(raw('sudo: session opened for user root'))).toBeUndefined();
   });
 });
+
+describe('parseAuthLog: real sshd lines (shipped via /ingest)', () => {
+  it.each([
+    [
+      'Oct 18 09:00:01 vm sshd[811]: Failed password for root from 203.0.113.9 port 40022 ssh2',
+      { username: 'root', outcome: 'failure', sourceIp: '203.0.113.9' },
+    ],
+    [
+      'Failed password for invalid user admin from 203.0.113.9 port 40022 ssh2',
+      { username: 'admin', outcome: 'failure' },
+    ],
+    [
+      '2026-10-18T09:00:01.123+00:00 vm sshd-session[5120]: Accepted publickey for deploy from 2001:db8::7 port 52144 ssh2: ED25519 SHA256:abc',
+      { username: 'deploy', outcome: 'success', sourceIp: '2001:db8::7' },
+    ],
+    [
+      'Failed keyboard-interactive/pam for root from 198.51.100.4 port 1022 ssh2',
+      { username: 'root', outcome: 'failure' },
+    ],
+  ])('parses %s', (line, expected) => {
+    expect(parseAuthLog(raw(line))).toMatchObject(expected);
+  });
+
+  it('rejects a line whose "from" is not an IP address', () => {
+    expect(
+      parseAuthLog(raw('Failed password for root from attacker.example port 1 ssh2')),
+    ).toBeUndefined();
+  });
+
+  it('ignores other sshd chatter', () => {
+    expect(
+      parseAuthLog(raw('vm sshd[811]: Connection closed by 203.0.113.9 port 40022 [preauth]')),
+    ).toBeUndefined();
+  });
+});

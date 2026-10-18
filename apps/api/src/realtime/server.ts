@@ -15,6 +15,8 @@ import {
   type Role,
   RolePatch,
   type SocMetrics,
+  type RawLog,
+  Source,
 } from '@argus/contracts';
 import type { AppConfig } from '@argus/config';
 import type { Bus, IncidentEvent } from '../bus/index.js';
@@ -24,6 +26,7 @@ import type { SystemHealth } from '../system/index.js';
 import { canAccess, type AuthService, type SetRoleResult } from '../auth/index.js';
 import { RateLimiter } from './rate-limit.js';
 import { redactActors, type Actor } from '../audit/index.js';
+import { parseIngestBody } from '../ingest/index.js';
 
 declare module 'fastify' {
   interface FastifyRequest {
@@ -32,7 +35,15 @@ declare module 'fastify' {
   }
 }
 
-const UNGATED_PATHS = ['/healthz', '/auth/login', '/auth/register', '/auth/google', '/auth/status'];
+// /ingest is not a user route: it checks its own shipper tokens (see below)
+const UNGATED_PATHS = [
+  '/healthz',
+  '/auth/login',
+  '/auth/register',
+  '/auth/google',
+  '/auth/status',
+  '/ingest',
+];
 
 // 40 immediate requests, refilling at 5/sec (300/min sustained) — comfortably
 // above normal dashboard polling (/metrics every 3s, /system/health every 5s
@@ -75,6 +86,11 @@ export interface RealtimeOptions {
   listAdminUsers?: () => Promise<AdminUser[]>;
   setUserRole?: (actor: Actor | null, userId: string, role: Role) => Promise<SetRoleResult>;
   listAudit?: (limit: number) => Promise<AuditEntry[]>;
+  // POST /ingest; absent = the route answers 404 (no INGEST_TOKENS configured)
+  ingest?: {
+    checkToken: (token: string | undefined) => boolean;
+    publish: (records: RawLog[]) => Promise<void>;
+  };
   searchEvents?: (params: EventSearchParams) => Promise<NormalizedEvent[]>;
   getEventTrace?: (eventId: string) => Promise<EventTrace>;
   getSystemHealth?: () => Promise<SystemHealth>;
@@ -316,6 +332,39 @@ export async function createRealtimeServer(bus: Bus, port: number, opts: Realtim
   app.get('/admin/audit', async (req) => {
     const { limit } = req.query as { limit?: string };
     return { entries: (await opts.listAudit?.(clampLimit(limit) ?? 100)) ?? [] };
+  });
+
+  // NDJSON (Vector's newline-delimited framing) arrives as one string, split
+  // into records by parseIngestBody; text/plain is already a string
+  app.addContentTypeParser('application/x-ndjson', { parseAs: 'string' }, (_req, body, done) =>
+    done(null, body),
+  );
+
+  app.post('/ingest', { bodyLimit: 1024 * 1024 }, async (req, reply) => {
+    if (!opts.ingest) {
+      reply.code(404);
+      return { error: 'ingest is not enabled on this instance' };
+    }
+    const bearer = req.headers.authorization?.replace(/^Bearer\s+/i, '');
+    if (!opts.ingest.checkToken(bearer)) {
+      req.log.warn({ ip: req.ip }, 'ingest: rejected token');
+      reply.code(401);
+      return { error: 'invalid ingest token' };
+    }
+    const { source } = req.query as { source?: string };
+    const defaultSource = source === undefined ? undefined : Source.safeParse(source);
+    if (defaultSource && !defaultSource.success) {
+      reply.code(400);
+      return { error: `source must be one of ${Source.options.join(', ')}` };
+    }
+    const result = parseIngestBody(req.body, defaultSource?.data);
+    if ('error' in result) {
+      reply.code(400);
+      return result;
+    }
+    await opts.ingest.publish(result.records);
+    reply.code(202);
+    return { accepted: result.records.length, rejected: result.rejected };
   });
 
   app.get('/events', async (req) => {

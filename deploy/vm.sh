@@ -73,7 +73,7 @@ cmd_init() {
   chmod 600 "$ENV_FILE"
 
   local key bytes generated=0
-  for spec in AUTH_SECRET:32; do
+  for spec in AUTH_SECRET:32 INGEST_TOKENS:32; do
     key=${spec%%:*}
     bytes=${spec##*:}
     grep -qE "^$key=" "$ENV_FILE" || continue # not used by this env file
@@ -384,6 +384,13 @@ cmd_verify() {
 
   code=$(http_code -X POST -H 'content-type: application/json' -d '{"email":"probe@example.com","password":"preflight-probe"}' "$base/auth/register")
   if [[ $code == 403 ]]; then ok "POST /auth/register → 403 (sign-up disabled)"; else fail "POST /auth/register → $code (expected 403 — ALLOW_REGISTRATION must be false)"; fi
+
+  code=$(http_code -X POST -H 'authorization: Bearer verify-probe-not-a-token' -H 'content-type: text/plain' -d 'probe' "$base/ingest?source=nginx")
+  case $code in
+    401) ok "POST /ingest with a bad token → 401" ;;
+    404) warn "POST /ingest → 404: log ingest is off (set INGEST_TOKENS to enable it)" ;;
+    *) fail "POST /ingest with a bad token → $code (expected 401)" ;;
+  esac
 
   if curl -sS --max-time 10 "$base/simulate" 2>/dev/null | grep -q '"scenarios"'; then ok "GET /simulate → generator reachable"; else fail "GET /simulate did not reach the generator (nginx /simulate location?)"; fi
 
