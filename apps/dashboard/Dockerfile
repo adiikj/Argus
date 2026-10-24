@@ -1,5 +1,5 @@
 # Build from the repo root: docker build -f apps/dashboard/Dockerfile .
-FROM node:24-alpine AS base
+FROM node:25-alpine AS base
 RUN corepack enable
 RUN npm install -g turbo@^2.3.3
 
