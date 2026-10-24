@@ -37,7 +37,7 @@
     "@types/node": "^22.20.5",
     "eslint": "^9.39.5",
     "eslint-import-resolver-typescript": "^4.4.5",
-    "eslint-plugin-boundaries": "^6.0.2",
+    "eslint-plugin-boundaries": "^7.2.0",
     "prettier": "^3.9.10",
     "tsx": "^4.23.15",
     "turbo": "^2.11.9",
