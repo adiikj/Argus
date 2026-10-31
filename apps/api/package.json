@@ -22,7 +22,7 @@
     "@fastify/websocket": "^11.3.4",
     "@prisma/client": "^6.19.3",
     "fastify": "^5.12.7",
-    "jose": "^6.2.12",
+    "jose": "^6.2.13",
     "kafkajs": "^2.2.4",
     "maxmind": "^5.0.7",
     "prisma": "^6.19.3",
