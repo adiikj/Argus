@@ -31,7 +31,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0 # every commit, not just the tip
           persist-credentials: false
@@ -51,7 +51,7 @@ jobs:
       contents: read
       security-events: write # upload SARIF to the Security tab
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
       - name: Install trivy (checksum-pinned)
@@ -67,7 +67,7 @@ jobs:
           ./trivy fs . --scanners vuln,secret,misconfig --severity HIGH,CRITICAL \
             --ignore-unfixed --format sarif --output trivy.sarif
       - name: Upload to code scanning
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         # code scanning needs a public repo (or GitHub Advanced Security)
         continue-on-error: true
         with:
@@ -81,7 +81,7 @@ jobs:
 
       - name: Generate SBOM (CycloneDX)
         run: ./trivy fs . --format cyclonedx --output sbom.cdx.json
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: sbom-cyclonedx
           path: sbom.cdx.json
